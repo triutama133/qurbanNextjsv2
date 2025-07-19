@@ -12,26 +12,62 @@ const SmallSpinner = () => (
   </svg>
 );
 
+// Skeleton Loader untuk Card
+const CardSkeleton = () => (
+  <div className="bg-white p-6 rounded-xl shadow-lg animate-pulse">
+    <div className="h-6 bg-gray-200 rounded w-3/4 mb-4"></div>
+    <div className="space-y-2">
+      <div className="h-4 bg-gray-200 rounded w-full"></div>
+      <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+    </div>
+  </div>
+);
+
+// Skeleton Loader untuk Riwayat/List
+const ListSkeleton = () => (
+    <div className="bg-white p-6 rounded-xl shadow-lg animate-pulse">
+        <div className="h-6 bg-gray-200 rounded w-2/3 mb-4"></div>
+        <div className="space-y-3">
+            <div className="h-10 bg-gray-200 rounded"></div>
+            <div className="h-10 bg-gray-200 rounded"></div>
+            <div className="h-10 bg-gray-200 rounded"></div>
+        </div>
+    </div>
+);
+
 
 export default function DashboardPage() {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [globalConfig, setGlobalConfig] = useState(null);
+
+  // Data Keuangan Pribadi
   const [personalTotalRecorded, setPersonalTotalRecorded] = useState(0); // Total tabungan pribadi tercatat (Setoran)
   const [personalUsed, setPersonalUsed] = useState(0); // Total tabungan terpakai untuk keperluan lain
-  const [personalTransferred, setPersonalTransferred] = useState(0); // Total tabungan sudah ditransfer ke tim (approved)
+  const [personalTransferred, setPersonalTransferred] = useState(0); // Total tabungan sudah ditransfer ke panitia (approved)
+  
+  // Riwayat Transaksi
   const [personalSavingHistory, setPersonalSavingHistory] = useState([]); // Riwayat setoran/penggunaan pribadi
   const [personalTransferConfirmations, setPersonalTransferConfirmations] = useState([]); // Riwayat konfirmasi transfer
+  const [userHelpDeskTickets, setUserHelpDeskTickets] = useState([]); // Tiket Help Desk user
+
+  // Data Global
   const [news, setNews] = useState([]);
-  const [milestones, setMilestones] = useState(null); // Milestone bisa null jika belum ada
-  const [loading, setLoading] = useState(true);
+  const [milestones, setMilestones] = useState(null); 
+  
+  // Loading State
+  const [loadingInitial, setLoadingInitial] = useState(true); // Loading untuk data profil & global config (seluruh page)
+  const [loadingSections, setLoadingSections] = useState(false); // Loading untuk bagian-bagian dalam dashboard setelah init load
+  
+  // Error State
   const [error, setError] = useState(null);
 
   // Loading state spesifik untuk setiap form
   const [addSavingLoading, setAddSavingLoading] = useState(false);
   const [useSavingLoading, setUseSavingLoading] = useState(false);
   const [confirmTransferLoading, setConfirmTransferLoading] = useState(false);
-  const [helpDeskLoading, setHelpDeskLoading] = useState(false);
+  const [helpDeskFormLoading, setHelpDeskFormLoading] = useState(false); // Ganti nama agar tidak konflik dengan loadingSections
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -64,8 +100,8 @@ export default function DashboardPage() {
   };
 
   // --- Data Fetching Logic ---
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchAllDashboardData = async () => {
+    setLoadingInitial(true); // Mulai loading awal untuk keseluruhan halaman
     setError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -75,120 +111,158 @@ export default function DashboardPage() {
       }
       setUser(user);
 
+      // Fetch Global Config (Initial Load)
       const { data: configData, error: configError } = await supabase
           .from('app_config')
           .select('*')
           .eq('id', 'global_settings')
           .single();
-
       if (configError || !configData) {
           throw new Error(configError?.message || 'Data konfigurasi global tidak ditemukan.');
       }
       setGlobalConfig(configData);
 
+      // Fetch User Profile (Initial Load)
       const { data: profileData, error: profileError } = await supabase
         .from('users')
-        .select('*, "NamaPequrban", "StatusPequrban", "Benefits"')
+        .select('*, "NamaPequrban", "StatusPequrban", "Benefits", "IsInitialDepositMade"')
         .eq('UserId', user.id)
         .single();
-
       if (profileError || !profileData) {
         throw new Error(profileError?.message || 'Data profil tidak ditemukan.');
       }
       setProfile(profileData);
-
-      const { data: savingHistoryData, error: savingHistoryError } = await supabase
-        .from('tabungan')
-        .select('*')
-        .eq('UserId', user.id)
-        .order('Tanggal', { ascending: false });
-
-      if (savingHistoryError) {
-        throw savingHistoryError;
-      }
-      setPersonalSavingHistory(savingHistoryData);
       
-      let totalRecorded = 0; // Total Setoran
-      let totalUsed = 0; // Total Penggunaan
-      savingHistoryData.forEach(item => {
-          if (item.Tipe === 'Setoran') {
-              totalRecorded += (item.Jumlah || 0);
-          } else if (item.Tipe === 'Penggunaan') {
-              totalUsed += (item.Jumlah || 0);
-          }
-      });
-      setPersonalTotalRecorded(totalRecorded);
-      setPersonalUsed(totalUsed);
-
-      const { data: transferData, error: transferError } = await supabase
-          .from('transfer_confirmations')
-          .select('*')
-          .eq('UserId', user.id)
-          .eq('Status', 'Approved') // Hanya yang sudah diverifikasi admin
-          .order('Timestamp', { ascending: false });
-
-      if (transferError) {
-          throw transferError;
-      }
-      setPersonalTransferConfirmations(transferData);
-      setPersonalTransferred(transferData.reduce((sum, item) => sum + (item.Amount || 0), 0));
-
-      const { data: newsData, error: newsError } = await supabase
-        .from('newsletters')
-        .select('*')
-        .order('DatePublished', { ascending: false })
-        .limit(3);
-
-      if (newsError) {
-        throw newsError;
-      }
-      setNews(newsData);
-
-      const { data: milestonesData, error: milestonesError } = await supabase
-          .from('program_milestones')
-          .select('*')
-          .order('Year', { ascending: true })
-          .order('Order', { ascending: true });
-
-      if (milestonesError) {
-        if (milestonesError.code === 'PGRST116') { // Specific code for no rows found
-            setMilestones([]);
-        } else {
-            throw milestonesError;
-        }
-      } else {
-          setMilestones(milestonesData);
-      }
+      // --- Setelah data utama termuat, fetch data sections secara asinkron ---
+      setLoadingSections(true); // Set loading untuk sections
+      await Promise.all([
+        fetchPersonalData(user.id),
+        fetchGlobalContent(),
+        fetchUserHelpDeskTickets(user.id)
+      ]);
 
     } catch (err) {
       setError(err.message || "Terjadi kesalahan yang tidak diketahui.");
       console.error("Dashboard fetch error - full object:", err);
     } finally {
-      setLoading(false);
+      setLoadingInitial(false); // Selesai loading awal
+      setLoadingSections(false); // Selesai loading sections
     }
   };
 
-  useEffect(() => {
-    fetchData();
+  // Fungsi fetch data pribadi (dipecah untuk pembaruan granular)
+  const fetchPersonalData = async (userId) => {
+    try {
+        // Fetch Personal Saving History
+        const { data: savingHistoryData, error: savingHistoryError } = await supabase
+          .from('tabungan')
+          .select('*')
+          .eq('UserId', userId)
+          .order('Tanggal', { ascending: false });
+        if (savingHistoryError) throw savingHistoryError;
+        setPersonalSavingHistory(savingHistoryData);
+        
+        let totalRecorded = 0;
+        let totalUsed = 0;
+        savingHistoryData.forEach(item => {
+            if (item.Tipe === 'Setoran') {
+                totalRecorded += (item.Jumlah || 0);
+            } else if (item.Tipe === 'Penggunaan') {
+                totalUsed += (item.Jumlah || 0);
+            }
+        });
+        setPersonalTotalRecorded(totalRecorded);
+        setPersonalUsed(totalUsed);
 
+        // Fetch Personal Transfer Confirmations
+        const { data: transferData, error: transferError } = await supabase
+            .from('transfer_confirmations')
+            .select('*')
+            .eq('UserId', userId)
+            .eq('Status', 'Approved')
+            .order('Timestamp', { ascending: false });
+        if (transferError) throw transferError;
+        setPersonalTransferConfirmations(transferData);
+        setPersonalTransferred(transferData.reduce((sum, item) => sum + (item.Amount || 0), 0));
+    } catch (err) {
+        console.error("Error fetching personal data:", err);
+        throw err; // Lempar ulang agar ditangkap oleh fetchAllDashboardData
+    }
+  };
+
+  // Fungsi fetch konten global (berita, milestone)
+  const fetchGlobalContent = async () => {
+    try {
+        // Fetch News
+        const { data: newsData, error: newsError } = await supabase
+          .from('newsletters')
+          .select('*')
+          .order('DatePublished', { ascending: false })
+          .limit(3);
+        if (newsError) throw newsError;
+        setNews(newsData);
+
+        // Fetch Milestones
+        const { data: milestonesData, error: milestonesError } = await supabase
+            .from('program_milestones')
+            .select('*')
+            .order('Year', { ascending: true })
+            .order('Order', { ascending: true });
+        if (milestonesError) {
+            if (milestonesError.code === 'PGRST116') { // Specific code for no rows found
+                setMilestones([]);
+            } else {
+                throw milestonesError;
+            }
+        } else {
+            setMilestones(milestonesData);
+        }
+    } catch (err) {
+        console.error("Error fetching global content:", err);
+        throw err;
+    }
+  };
+
+  // Fungsi fetch tiket Help Desk user
+  const fetchUserHelpDeskTickets = async (userId) => {
+    try {
+        const { data: ticketsData, error: ticketsError } = await supabase
+            .from('help_desk_tickets')
+            .select('*')
+            .eq('UserId', userId)
+            .order('Timestamp', { ascending: false });
+        
+        if (ticketsError) throw ticketsError;
+        setUserHelpDeskTickets(ticketsData);
+    } catch (err) {
+        console.error("Error fetching help desk tickets:", err);
+        throw err;
+    }
+  };
+
+
+  useEffect(() => {
+    // Hanya panggil fetchAllDashboardData saat komponen mount atau ketika user/router/searchParams berubah
+    fetchAllDashboardData();
+
+    // Listener untuk perubahan status autentikasi
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
         if (!session) {
             router.push('/login');
         } else {
             setUser(session.user);
-            fetchData();
+            fetchAllDashboardData(); // Re-fetch all data if auth state changes (e.g., user logs in/out)
         }
     });
 
     return () => {
         authListener.subscription.unsubscribe();
     };
-  }, [router, searchParams]);
-
+  }, [router, searchParams]); // searchParams untuk memicu refresh jika tab berubah
 
   // --- Event Handlers ---
   const handleSignOut = async () => {
-    setLoading(true);
+    setLoadingInitial(true); // Set loading for full page transition
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error('Error signing out:', error.message);
@@ -196,7 +270,7 @@ export default function DashboardPage() {
     } else {
       router.push('/login');
     }
-    setLoading(false);
+    setLoadingInitial(false);
   };
 
   const handleAddSaving = async (e) => {
@@ -213,6 +287,8 @@ export default function DashboardPage() {
       return;
     }
 
+    // Metode 'Setor ke Tim' sudah dihapus dari register, jadi ini mungkin tidak relevan
+    // tetapi kita pertahankan validasi file jika ada fitur serupa di masa depan.
     if (profile?.MetodeTabungan === 'Setor ke Tim' && !e.target.elements.proofFile?.files[0]) {
       savingMessageEl.textContent = 'Bukti setor wajib diunggah untuk metode ini.';
       savingMessageEl.className = 'text-sm mt-3 text-red-600';
@@ -239,18 +315,19 @@ export default function DashboardPage() {
           "TransaksiId": newTransactionId,
           "UserId": user.id,
           "Jumlah": amount,
-          "Metode": profile.MetodeTabungan,
+          "Metode": profile.MetodeTabungan, // Ini akan menjadi "Menabung Sendiri"
           "Tanggal": newTanggal,
           "Tipe": "Setoran",
           "Status": "Confirmed",
           "ProofLink": proofUrl,
-          "VerificationStatus": profile.MetodeTabungan === 'Setor ke Tim' ? 'Pending' : null,
+          "VerificationStatus": null, // Tidak ada verifikasi untuk Menabung Sendiri
         });
 
       if (error) {
         throw error;
       }
 
+      // Update UI granular
       setPersonalSavingHistory(prev => [{
         "TransaksiId": newTransactionId,
         "UserId": user.id,
@@ -260,7 +337,7 @@ export default function DashboardPage() {
         "Tipe": "Setoran",
         "Status": "Confirmed",
         "ProofLink": proofUrl,
-        "VerificationStatus": profile.MetodeTabungan === 'Setor ke Tim' ? 'Pending' : null,
+        "VerificationStatus": null,
       }, ...prev].sort((a,b) => new Date(b.Tanggal) - new Date(a.Tanggal)));
       setPersonalTotalRecorded(prev => prev + amount);
 
@@ -350,6 +427,83 @@ export default function DashboardPage() {
     }
   };
 
+  const handleInitialDeposit = async (e) => {
+    e.preventDefault();
+    // Anda bisa menambahkan loading state khusus untuk form ini jika diperlukan
+    const initialProofFile = e.target.elements.initialProofFile?.files[0];
+    const initialMessageEl = document.getElementById('initialMessage');
+
+    if (!initialProofFile) {
+        initialMessageEl.textContent = 'Bukti transfer wajib diunggah.';
+        initialMessageEl.className = 'text-sm mt-3 text-red-600';
+        return;
+    }
+
+    try {
+        initialMessageEl.textContent = 'Mengunggah bukti & Mencatat Setoran Awal...';
+        initialMessageEl.className = 'text-sm mt-3 text-gray-600';
+        
+        // Simulasikan upload file
+        console.warn("Upload file proof (initial deposit): Implementasi API Route '/api/upload-file' masih diperlukan.");
+        const proofUrl = `dummy_initial_url_${Date.now()}`;
+
+        const newTransactionId = `INIT-${Date.now()}`;
+        const newTanggal = new Date().toISOString();
+
+        const { data: savingData, error: savingError } = await supabase
+            .from('tabungan')
+            .insert({
+                "TransaksiId": newTransactionId,
+                "UserId": user.id,
+                "Jumlah": globalConfig.InitialDepositAmount,
+                "Metode": "Setoran Awal", // Metode khusus
+                "Tanggal": newTanggal,
+                "Tipe": "Setoran",
+                "Status": "Confirmed",
+                "ProofLink": proofUrl,
+                "VerificationStatus": "Pending", // Setoran awal mungkin juga perlu verifikasi admin
+            });
+
+        if (savingError) {
+            throw savingError;
+        }
+
+        // Update status IsInitialDepositMade di public.users
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({ "IsInitialDepositMade": true })
+            .eq('UserId', user.id);
+
+        if (updateError) {
+            throw updateError;
+        }
+
+        initialMessageEl.textContent = 'Setoran Awal berhasil dicatat! Menunggu verifikasi.';
+        initialMessageEl.className = 'text-sm mt-3 text-green-600';
+        e.target.reset();
+        // Update profile state secara granular
+        setProfile(prevProfile => ({ ...prevProfile, IsInitialDepositMade: true }));
+        // Update riwayat dan total tercatat
+        setPersonalSavingHistory(prev => [{
+            "TransaksiId": newTransactionId,
+            "UserId": user.id,
+            "Jumlah": globalConfig.InitialDepositAmount,
+            "Metode": "Setoran Awal",
+            "Tanggal": newTanggal,
+            "Tipe": "Setoran",
+            "Status": "Confirmed",
+            "ProofLink": proofUrl,
+            "VerificationStatus": "Pending",
+        }, ...prev].sort((a,b) => new Date(b.Tanggal) - new Date(a.Tanggal)));
+        setPersonalTotalRecorded(prev => prev + globalConfig.InitialDepositAmount);
+
+    } catch (err) {
+        console.error('Error initial deposit:', err.message);
+        initialMessageEl.textContent = 'Gagal mencatat setoran awal: ' + err.message;
+        initialMessageEl.className = 'text-sm mt-3 text-red-600';
+    }
+  };
+
   const handleConfirmTransfer = async (e) => {
     e.preventDefault();
     setConfirmTransferLoading(true);
@@ -377,6 +531,15 @@ export default function DashboardPage() {
         confirmMessageEl.className = 'text-sm mt-3 text-red-600';
         setConfirmTransferLoading(false);
         return;
+    }
+
+    // Validasi target transfer
+    // PERBAIKAN: Gunakan personalTotalRecorded karena ini mencakup setoran awal
+    if (personalTotalRecorded < (globalConfig?.TargetForTransfer || 0)) {
+      confirmMessageEl.textContent = `Dana tercatat belum mencapai target transfer ${formatRupiah(globalConfig?.TargetForTransfer || 0)}.`;
+      confirmMessageEl.className = 'text-sm mt-3 text-red-600';
+      setConfirmTransferLoading(false);
+      return;
     }
 
     try {
@@ -432,7 +595,7 @@ export default function DashboardPage() {
 
   const handleHelpDeskSubmit = async (e) => {
     e.preventDefault();
-    setHelpDeskLoading(true);
+    setHelpDeskFormLoading(true);
     const questionInput = e.target.elements.question;
     const question = questionInput.value.trim();
     const helpDeskMessageEl = document.getElementById('helpDeskMessage');
@@ -440,7 +603,7 @@ export default function DashboardPage() {
     if (!question) {
       helpDeskMessageEl.textContent = 'Pertanyaan tidak boleh kosong.';
       helpDeskMessageEl.className = 'text-sm mt-3 text-red-600';
-      setHelpDeskLoading(false);
+      setHelpDeskFormLoading(false);
       return;
     }
 
@@ -448,19 +611,34 @@ export default function DashboardPage() {
       helpDeskMessageEl.textContent = 'Mengirim pertanyaan...';
       helpDeskMessageEl.className = 'text-sm mt-3 text-gray-600';
 
+      const newTicketId = `TICKET-${Date.now()}`;
+      const newTimestamp = new Date().toISOString();
+
       const { data, error } = await supabase
         .from('help_desk_tickets')
         .insert({
-          "TicketId": `TICKET-${Date.now()}`,
+          "TicketId": newTicketId,
           "UserId": user.id,
           "Question": question,
-          "Timestamp": new Date().toISOString(),
+          "Timestamp": newTimestamp,
           "Status": "Open",
         });
 
       if (error) {
         throw error;
       }
+
+      // Update UI granular untuk tiket
+      setUserHelpDeskTickets(prev => [{
+        "TicketId": newTicketId,
+        "UserId": user.id,
+        "Question": question,
+        "Timestamp": newTimestamp,
+        "Status": "Open",
+        "AdminResponse": null,
+        "AdminUserId": null,
+        "ResponseTimestamp": null
+      }, ...prev].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)));
 
       helpDeskMessageEl.textContent = 'Pertanyaan berhasil dikirim. Admin akan segera merespons.';
       helpDeskMessageEl.className = 'text-sm mt-3 text-green-600';
@@ -471,7 +649,7 @@ export default function DashboardPage() {
       helpDeskMessageEl.textContent = 'Gagal mengirim pertanyaan: ' + err.message;
       helpDeskMessageEl.className = 'text-sm mt-3 text-red-600';
     } finally {
-        setHelpDeskLoading(false);
+        setHelpDeskFormLoading(false);
     }
   };
 
@@ -519,7 +697,16 @@ export default function DashboardPage() {
   };
 
   // --- Render Logic ---
-  if (loading) return <div className="text-center mt-10">Memuat dashboard...</div>;
+  // Initial loading overlay for the entire page
+  if (loadingInitial) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="spinner"></div> {/* Spinner utama di tengah layar */}
+        <p className="ml-4 text-gray-700">Memuat dashboard...</p>
+      </div>
+    );
+  }
+
   if (error) return <div className="text-center mt-10 text-red-500">Error: {error}</div>;
 
   // Rekomendasi Tabung Per Bulan
@@ -536,6 +723,11 @@ export default function DashboardPage() {
     }
   }
 
+  // --- Cek Status Setoran Awal ---
+  const isInitialDepositMade = profile?.IsInitialDepositMade;
+  // const isTargetForTransferReached = personalTotalRecorded >= (globalConfig?.TargetForTransfer || 0); // Sudah dicek di handler
+  
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -551,7 +743,7 @@ export default function DashboardPage() {
             
             {/* Tombol Refresh Data */}
             <button
-                onClick={fetchData}
+                onClick={fetchAllDashboardData} // Memanggil fetchAllDashboardData untuk refresh
                 className="text-sm font-medium text-gray-600 hover:text-green-700 flex items-center space-x-1"
                 title="Refresh Data"
             >
@@ -583,7 +775,7 @@ export default function DashboardPage() {
         <div className="px-4 py-6 sm:px-0">
           {currentTab === 'helpdesk' ? (
             // Tampilan Help Desk jika tab aktif
-            <div className="bg-white p-6 rounded-xl shadow-lg md:col-span-3"> {/* Mengisi seluruh lebar */}
+            <div className="bg-white p-6 rounded-xl shadow-lg md:col-span-3">
                 <h3 className="text-xl font-bold mb-4 text-gray-900">Help Desk</h3>
                 <div className="space-y-4">
                     <div>
@@ -594,6 +786,7 @@ export default function DashboardPage() {
                             <li>Telepon: +62 812 3456 7890</li>
                         </ul>
                     </div>
+                    {/* Form Pertanyaan */}
                     <form className="space-y-4" onSubmit={handleHelpDeskSubmit}>
                         <div>
                             <label htmlFor="question" className="block text-sm font-medium text-gray-700">Tanyakan Sesuatu:</label>
@@ -602,13 +795,52 @@ export default function DashboardPage() {
                         <button
                             type="submit"
                             className="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm font-medium flex items-center justify-center"
-                            disabled={helpDeskLoading}
+                            disabled={helpDeskFormLoading}
                         >
-                            {helpDeskLoading ? <SmallSpinner /> : null}
-                            {helpDeskLoading ? 'Mengirim...' : 'Kirim Pertanyaan'}
+                            {helpDeskFormLoading ? <SmallSpinner /> : null}
+                            {helpDeskFormLoading ? 'Mengirim...' : 'Kirim Pertanyaan'}
                         </button>
                     </form>
                     <p id="helpDeskMessage" className="text-sm mt-3"></p>
+                    
+                    {/* Riwayat Tiket User */}
+                    <div className="mt-8">
+                        <h4 className="font-semibold text-md text-gray-800 mb-2">Riwayat Pertanyaan Anda</h4>
+                        {loadingSections ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
+                            <div className="max-h-60 overflow-y-auto pr-2">
+                                {userHelpDeskTickets.length > 0 ? (
+                                    userHelpDeskTickets.map((ticket) => (
+                                        <div key={ticket.TicketId} className="flex flex-col py-2 border-b border-gray-200 last:border-b-0">
+                                            <p className="font-medium text-sm text-gray-900">
+                                                {ticket.Question.substring(0, 70)}{ticket.Question.length > 70 ? '...' : ''}
+                                            </p>
+                                            <div className="flex justify-between items-center text-xs text-gray-500 mt-1">
+                                                <span>Diajukan: {new Date(ticket.Timestamp).toLocaleDateString('id-ID')}</span>
+                                                <span className={`px-2 py-0.5 rounded-full font-semibold ${
+                                                    ticket.Status === 'Open' ? 'bg-yellow-100 text-yellow-800' :
+                                                    ticket.Status === 'Answered' ? 'bg-green-100 text-green-800' :
+                                                    'bg-gray-100 text-gray-800'
+                                                }`}>
+                                                    {ticket.Status}
+                                                </span>
+                                            </div>
+                                            {ticket.AdminResponse && (
+                                                <div className="mt-2 p-2 bg-gray-50 rounded-md text-sm text-gray-700 border border-gray-200">
+                                                    <p className="font-semibold">Jawaban Admin:</p>
+                                                    <p>{ticket.AdminResponse}</p>
+                                                    <p className="text-xs text-gray-500 mt-1">
+                                                        Dijawab: {ticket.ResponseTimestamp ? new Date(ticket.ResponseTimestamp).toLocaleDateString('id-ID') : 'N/A'}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-gray-500 text-sm">Belum ada pertanyaan yang Anda ajukan.</p>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <div className="mt-6 text-center">
                     <a href="/dashboard" className="text-indigo-600 hover:text-indigo-800 font-medium">
@@ -619,157 +851,165 @@ export default function DashboardPage() {
           ) : (
             // Tampilan Dashboard Utama jika tab bukan Help Desk
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Kolom Kiri: Profil Pequrban, Capaian Pribadi, Milestone, Berita */}
+              {/* Kolom Kiri (2/3 lebar di layar besar): Profil, Capaian Pribadi, Milestone, Berita */}
               <div className="lg:col-span-2 space-y-6"> 
                 {/* Profil Pequrban Card */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                   <h2 className="text-xl font-bold mb-4 text-gray-800">Profil Pequrban</h2>
-                  {profile && (
-                    <div className="space-y-2 text-sm text-gray-700">
-                      <p><strong>Nama Pequrban:</strong> {profile.NamaPequrban || profile.Nama}</p>
-                      <p><strong>Status Pequrban:</strong> <span className="font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800">{profile.StatusPequrban || 'Normal'}</span></p>
-                      {profile.Benefits && profile.Benefits.length > 0 ? (
-                        <div>
-                          <strong>Benefit Anda:</strong>
-                          <ul className="list-disc list-inside ml-4 mt-1">
-                            {profile.Benefits.map((benefit, index) => (
-                              <li key={index}>{benefit}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : (
-                          <p className="text-gray-500">Belum ada benefit yang ditetapkan.</p>
-                      )}
-                    </div>
+                  {loadingSections ? <CardSkeleton /> : (
+                      profile && (
+                          <div className="space-y-2 text-sm text-gray-700">
+                            <p><strong>Nama Pequrban:</strong> {profile.NamaPequrban || profile.Nama}</p>
+                            <p><strong>Status Pequrban:</strong> <span className="font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800">{profile.StatusPequrban || 'Normal'}</span></p>
+                            {profile.Benefits && profile.Benefits.length > 0 ? (
+                              <div>
+                                <strong>Benefit Anda:</strong>
+                                <ul className="list-disc list-inside ml-4 mt-1">
+                                  {profile.Benefits.map((benefit, index) => (
+                                    <li key={index}>{benefit}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ) : (
+                                <p className="text-gray-500">Belum ada benefit yang ditetapkan.</p>
+                            )}
+                          </div>
+                      )
                   )}
                 </div>
 
                 {/* Personal Progress Card */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                   <h2 className="text-xl font-bold mb-4 text-green-800">Capaian Pribadi Anda</h2>
-                  <div id="personal-progress-container">
-                    <div className="relative pt-1">
-                      <div className="flex mb-2 items-center justify-between">
-                        <div>
-                          <span id="personal-target-text" className="text-xs font-semibold inline-block text-gray-600">
-                            Progress menuju target {profile ? formatRupiah(profile.TargetPribadi || globalConfig?.TargetPribadiDefault || 0) : 'Rp 0'}
-                            {globalConfig?.TanggalTargetQurban && (
-                                ` (Target: ${new Date(globalConfig.TanggalTargetQurban).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})})`
-                            )}
-                          </span>
+                  {loadingSections ? <CardSkeleton /> : (
+                      <div id="personal-progress-container">
+                        <div className="relative pt-1">
+                          <div className="flex mb-2 items-center justify-between">
+                            <div>
+                              <span id="personal-target-text" className="text-xs font-semibold inline-block text-gray-600">
+                                Progress menuju target {profile ? formatRupiah(profile.TargetPribadi || globalConfig?.TargetPribadiDefault || 0) : 'Rp 0'}
+                                {globalConfig?.TanggalTargetQurban && (
+                                    ` (Target: ${new Date(globalConfig.TanggalTargetQurban).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'})})`
+                                )}
+                              </span>
+                            </div>
+                          </div>
+                          {/* Progress Bar berdasarkan total tercatat (setoran - penggunaan) */}
+                          <div className="overflow-hidden h-4 mb-4 text-xs flex rounded bg-gray-200">
+                            <div
+                              id="personal-progress-bar"
+                              style={{ width: `${profile && (profile.TargetPribadi || globalConfig?.TargetPribadiDefault) > 0 ? Math.min(((personalTotalRecorded - personalUsed) / (profile.TargetPribadi || globalConfig.TargetPribadiDefault)) * 100, 100) : 0}%` }}
+                              className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-500"
+                            ></div>
+                          </div>
                         </div>
-                      </div>
-                      {/* Progress Bar berdasarkan total tercatat (setoran - penggunaan) */}
-                      <div className="overflow-hidden h-4 mb-4 text-xs flex rounded bg-gray-200">
-                        <div
-                          id="personal-progress-bar"
-                          style={{ width: `${profile && (profile.TargetPribadi || globalConfig?.TargetPribadiDefault) > 0 ? Math.min(((personalTotalRecorded - personalUsed) / (profile.TargetPribadi || globalConfig.TargetPribadiDefault)) * 100, 100) : 0}%` }}
-                          className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-green-500"
-                        ></div>
-                      </div>
-                    </div>
-                    {/* Visualisasi Angka Capaian Pribadi yang Lebih Menarik */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                        <div className="bg-green-50 p-4 rounded-lg text-center">
-                            <p className="text-sm text-gray-500">Tabungan Tercatat</p>
-                            <p className="text-2xl font-bold text-green-700">{formatRupiah(personalTotalRecorded)}</p>
-                        </div>
-                        <div className="bg-red-50 p-4 rounded-lg text-center">
-                            <p className="text-sm text-gray-500">Dana Terpakai</p>
-                            <p className="text-2xl font-bold text-red-600">{formatRupiah(personalUsed)}</p>
-                        </div>
-                        <div className="bg-blue-50 p-4 rounded-lg text-center">
-                            <p className="text-sm text-gray-500">Ditransfer ke Panitia Qurban</p>
-                            <p className="text-2xl font-bold text-blue-600">{formatRupiah(personalTransferred)}</p>
-                        </div>
-                        <div className="bg-gray-50 p-4 rounded-lg text-center">
-                            <p className="text-sm text-gray-500">
-                                Dana Sisa Tabungan <span className="text-gray-400 text-xs">*</span>
-                            </p>
-                            <p className="text-2xl font-bold text-gray-700">
-                                {formatRupiah(personalTotalRecorded - personalUsed - personalTransferred)}
-                            </p>
-                        </div>
-                    </div>
-                    
-                    {profile && (
-                        <div className="mt-4 text-sm" id="personal-info">
-                            <p>Metode Anda: <span className="font-semibold">{profile.MetodeTabungan}</span></p>
-                            {rekomendasiTabungPerBulan > 0 && (
-                                <p className="mt-2 text-base text-gray-700">
-                                Rekomendasi tabung per bulan: <span className="font-bold text-green-700">{formatRupiah(rekomendasiTabungPerBulan)}</span>
+                        {/* Visualisasi Angka Capaian Pribadi yang Lebih Menarik */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                            <div className="bg-green-50 p-4 rounded-lg text-center">
+                                <p className="text-sm text-gray-500">Tabungan Tercatat</p>
+                                <p className="text-2xl font-bold text-green-700">{formatRupiah(personalTotalRecorded)}</p>
+                            </div>
+                            <div className="bg-red-50 p-4 rounded-lg text-center">
+                                <p className="text-sm text-gray-500">Dana Terpakai</p>
+                                <p className="text-2xl font-bold text-red-600">{formatRupiah(personalUsed)}</p>
+                            </div>
+                            <div className="bg-blue-50 p-4 rounded-lg text-center">
+                                <p className="text-sm text-gray-500">Ditransfer ke Panitia Qurban</p>
+                                <p className="text-2xl font-bold text-blue-600">{formatRupiah(personalTransferred)}</p>
+                            </div>
+                            <div className="bg-gray-50 p-4 rounded-lg text-center">
+                                <p className="text-sm text-gray-500">
+                                    Dana Sisa Tabungan <span className="text-gray-400 text-xs">*</span>
                                 </p>
-                            )}
-                            <p className="mt-2 text-xs text-gray-500">
-                                <span className="font-bold">* Dana Sisa Tabungan</span>: Dana Tercatat dikurangi Dana Terpakai.
-                            </p>
+                                <p className="text-2xl font-bold text-gray-700">
+                                    {formatRupiah(personalTotalRecorded - personalUsed - personalTransferred)}
+                                </p>
+                            </div>
                         </div>
-                    )}
-                  </div>
+                        
+                        {profile && (
+                            <div className="mt-4 text-sm" id="personal-info">
+                                <p>Metode Anda: <span className="font-semibold">{profile.MetodeTabungan}</span></p>
+                                {rekomendasiTabungPerBulan > 0 && (
+                                    <p className="mt-2 text-base text-gray-700">
+                                    Rekomendasi tabung per bulan: <span className="font-bold text-green-700">{formatRupiah(rekomendasiTabungPerBulan)}</span>
+                                    </p>
+                                )}
+                                <p className="mt-2 text-xs text-gray-500">
+                                    <span className="font-bold">* Dana Sisa Tabungan</span>: Dana Tercatat dikurangi Dana Terpakai.
+                                </p>
+                            </div>
+                        )}
+                      </div>
+                  )}
                 </div>
 
                 {/* Milestone Program Card */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                     <h2 className="text-xl font-bold mb-4 text-gray-800">Milestone Program</h2>
-                    <div className="overflow-x-auto">
-                        <div className="flex space-x-4 pb-2 min-w-max">
-                            {milestones && milestones.length > 0 ? (
-                                Object.values(
-                                    milestones.reduce((acc, milestone) => {
-                                        const yearMonth = `${milestone.Month}-${milestone.Year}`;
-                                        if (!acc[yearMonth]) {
-                                            acc[yearMonth] = { month: milestone.Month, year: milestone.Year, activities: [] };
-                                        }
-                                        acc[yearMonth].activities.push(milestone);
-                                        return acc;
-                                    }, {})
-                                ).sort((a, b) => {
-                                    const monthOrder = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-                                    if (a.year !== b.year) return a.year - b.year;
-                                    return monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month);
-                                }).map((monthEntry, monthIndex) => (
-                                    <div key={`milestone-view-${monthEntry.month}-${monthEntry.year}`} className="flex-shrink-0 w-48 border border-gray-200 rounded-lg p-3 bg-gray-50">
-                                        <h3 className="font-semibold text-sm mb-2 text-center text-gray-800">
-                                            {monthEntry.month} {monthEntry.Year}
-                                        </h3>
-                                        <ul className="space-y-1 text-xs text-gray-600">
-                                            {/* Sort activities by order */}
-                                            {monthEntry.activities.sort((a,b) => a.Order - b.Order).map((activity) => (
-                                                <li key={activity.MilestoneId} className="p-1 bg-white rounded shadow-sm text-center">
-                                                    {activity.Activity}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-gray-500 text-sm">Belum ada milestone program.</p>
-                            )}
+                    {loadingSections ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
+                        <div className="overflow-x-auto">
+                            <div className="flex space-x-4 pb-2 min-w-max">
+                                {milestones && milestones.length > 0 ? (
+                                    Object.values(
+                                        milestones.reduce((acc, milestone) => {
+                                            const yearMonth = `${milestone.Month}-${milestone.Year}`;
+                                            if (!acc[yearMonth]) {
+                                                acc[yearMonth] = { month: milestone.Month, year: milestone.Year, activities: [] };
+                                            }
+                                            acc[yearMonth].activities.push(milestone);
+                                            return acc;
+                                        }, {})
+                                    ).sort((a, b) => {
+                                        const monthOrder = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+                                        if (a.year !== b.year) return a.year - b.year;
+                                        return monthOrder.indexOf(a.month) - monthOrder.indexOf(b.month);
+                                    }).map((monthEntry, monthIndex) => (
+                                        <div key={`milestone-view-${monthEntry.month}-${monthEntry.year}`} className="flex-shrink-0 w-48 border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                            <h3 className="font-semibold text-sm mb-2 text-center text-gray-800">
+                                                {monthEntry.month} {monthEntry.Year}
+                                            </h3>
+                                            <ul className="space-y-1 text-xs text-gray-600">
+                                                {/* Sort activities by order */}
+                                                {monthEntry.activities.sort((a,b) => a.Order - b.Order).map((activity) => (
+                                                    <li key={activity.MilestoneId} className="p-1 bg-white rounded shadow-sm text-center">
+                                                        {activity.Activity}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-gray-500 text-sm">Belum ada milestone program.</p>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* News Card */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                     <h2 className="text-xl font-bold mb-4 text-gray-800">Berita & Informasi Terbaru</h2>
-                    <div id="newsContainer" className="space-y-4">
-                        {news.length > 0 ? (
-                            news.map((item) => (
-                                <article key={item.NewsletterId} className="border-t border-gray-200 pt-4 first:border-t-0 first:pt-0">
-                                    {item.FotoLinks && item.FotoLinks.length > 0 && (
-                                        <img src={item.FotoLinks[0]} alt={item.Title} className="w-full h-40 object-cover rounded-md mb-2" />
-                                    )}
-                                    <h3 className="text-lg font-semibold text-gray-900">{item.Title}</h3>
-                                    <p className="text-xs text-gray-500 mb-2">Oleh {item.AuthorName} - {new Date(item.DatePublished).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                    <div className="text-sm text-gray-600">
-                                        {item.Content.substring(0, 150)}{item.Content.length > 150 ? '...' : ''}
-                                    </div>
-                                </article>
-                            ))
-                        ) : (
-                            <p className="text-gray-500 text-sm">Belum ada berita terbaru.</p>
-                        )}
-                    </div>
+                    {loadingSections ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
+                        <div id="newsContainer" className="space-y-4">
+                            {news.length > 0 ? (
+                                news.map((item) => (
+                                    <article key={item.NewsletterId} className="border-t border-gray-200 pt-4 first:border-t-0 first:pt-0">
+                                        {item.FotoLinks && item.FotoLinks.length > 0 && (
+                                            <img src={item.FotoLinks[0]} alt={item.Title} className="w-full h-40 object-cover rounded-md mb-2" />
+                                        )}
+                                        <h3 className="text-lg font-semibold text-gray-900">{item.Title}</h3>
+                                        <p className="text-xs text-gray-500 mb-2">Oleh {item.AuthorName} - {new Date(item.DatePublished).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                                        <div className="text-sm text-gray-600">
+                                            {item.Content.substring(0, 150)}{item.Content.length > 150 ? '...' : ''}
+                                        </div>
+                                    </article>
+                                ))
+                            ) : (
+                                <p className="text-gray-500 text-sm">Belum ada berita terbaru.</p>
+                            )}
+                        </div>
+                    )}
                 </div>
               </div>
 
@@ -779,157 +1019,175 @@ export default function DashboardPage() {
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                   <div className="mb-4">
                       <h3 className="text-lg font-bold text-gray-900 mb-2">Pencatatan Transaksi</h3>
-                      <div className="border-b pb-4 mb-4">
-                          <h4 className="font-semibold text-md text-gray-800 mb-2">Catat Setoran Tabungan</h4>
-                          <form id="addSavingForm" className="space-y-4" onSubmit={handleAddSaving}>
-                              <div>
-                                  <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Jumlah (Rp)</label>
-                                  <input type="text" id="amount" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                                      onKeyUp={(e) => {
-                                          let value = e.target.value.replace(/[^0-9]/g, '');
-                                          e.target.value = value ? parseInt(value, 10).toLocaleString('id-ID') : '';
-                                      }}
-                                  />
-                              </div>
-                              {profile && profile.MetodeTabungan === 'Setor ke Tim' && (
-                                  <div id="proofUploadContainer">
-                                      <label htmlFor="proofFile" className="block text-sm font-medium text-gray-700">Bukti Setor (Wajib)</label>
-                                      <input type="file" id="proofFile" required className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100" />
-                                  </div>
-                              )}
-                              <div>
-                                  <button
-                                    type="submit"
-                                    id="saveBtn"
-                                    className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm font-medium flex items-center justify-center"
-                                    disabled={addSavingLoading}
-                                  >
-                                    {addSavingLoading ? <SmallSpinner /> : null}
-                                    {addSavingLoading ? 'Menyimpan...' : 'Catat Setoran'}
-                                  </button>
-                              </div>
-                          </form>
-                          <p id="savingMessage" className="text-sm mt-3"></p>
-                      </div>
-
-                      {profile && profile.MetodeTabungan === 'Menabung Sendiri' && (
-                          <div className="mb-4 border-b pb-4">
-                              <h4 className="font-semibold text-md text-gray-800 mb-2">Catat Penggunaan Tabungan</h4>
-                              <p className="text-sm text-gray-600 mb-2">Jika sebagian tabungan Anda terpakai untuk keperluan lain.</p>
-                              <form className="space-y-4" onSubmit={handleUseSaving}>
-                                  <div>
-                                      <label htmlFor="usedAmount" className="block text-sm font-medium text-gray-700">Jumlah Terpakai (Rp)</label>
-                                      <input type="text" id="usedAmount" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                                          onKeyUp={(e) => {
-                                              let value = e.target.value.replace(/[^0-9]/g, '');
-                                              e.target.value = value ? parseInt(value, 10).toLocaleString('id-ID') : '';
-                                          }}
-                                      />
-                                  </div>
-                                  <div>
-                                      <button
-                                        type="submit"
-                                        className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 text-sm font-medium flex items-center justify-center"
-                                        disabled={useSavingLoading}
-                                      >
-                                        {useSavingLoading ? <SmallSpinner /> : null}
-                                        {useSavingLoading ? 'Mencatat...' : 'Catat Penggunaan'}
-                                      </button>
-                                  </div>
-                              </form>
-                              <p id="usedMessage" className="text-sm mt-3"></p>
-                          </div>
+                      {/* Setoran Awal Card (opsional: bisa di dalam atau terpisah) */}
+                      {profile && !isInitialDepositMade && globalConfig && (
+                        <div className="border-b pb-4 mb-4">
+                            <h4 className="font-semibold text-md text-gray-800 mb-2">Setoran Awal Wajib</h4>
+                            <p className="text-sm text-gray-600 mb-2">Silakan lakukan setoran awal sebesar {formatRupiah(globalConfig.InitialDepositAmount)}.</p>
+                            <form id="initialDepositForm" className="space-y-4" onSubmit={handleInitialDeposit}>
+                                <div>
+                                    <label htmlFor="initialProofFile" className="block text-sm font-medium text-gray-700">Bukti Transfer (Wajib)</label>
+                                    <input type="file" id="initialProofFile" required className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100" />
+                                </div>
+                                <div>
+                                    <button type="submit" className="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm font-medium">Kirim Setoran Awal</button>
+                                </div>
+                            </form>
+                            <p id="initialMessage" className="text-sm mt-3"></p>
+                        </div>
                       )}
 
-                      {profile && profile.MetodeTabungan === 'Menabung Sendiri' && (
-                          <div>
-                              <h4 className="font-semibold text-md text-gray-800 mb-2">Konfirmasi Transfer Dana ke Tim</h4>
-                              <p className="text-sm text-gray-600 mb-2">Unggah bukti transfer dana yang sudah Anda kirim ke rekening tim. Ini bisa dicicil.</p>
-                              <form className="space-y-4" onSubmit={handleConfirmTransfer}>
-                                  <div>
-                                      <label htmlFor="transferAmount" className="block text-sm font-medium text-gray-700">Jumlah Transfer (Rp)</label>
-                                      <input type="text" id="transferAmount" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                                          onKeyUp={(e) => {
-                                              let value = e.target.value.replace(/[^0-9]/g, '');
-                                              e.target.value = value ? parseInt(value, 10).toLocaleString('id-ID') : '';
-                                          }}
-                                      />
-                                  </div>
-                                  <div>
-                                      <label htmlFor="transferProofFile" className="text-sm font-medium text-gray-700">Bukti Transfer (Wajib)</label>
-                                      <input type="file" id="transferProofFile" required className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100" />
-                                  </div>
-                                  <div>
-                                      <button
-                                        type="submit"
-                                        className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm font-medium flex items-center justify-center"
-                                        disabled={confirmTransferLoading}
-                                      >
-                                        {confirmTransferLoading ? <SmallSpinner /> : null}
-                                        {confirmTransferLoading ? 'Mengunggah...' : 'Kirim Konfirmasi'}
-                                      </button>
-                                  </div>
-                              </form>
-                              <p id="confirmMessage" className="text-sm mt-3"></p>
-                          </div>
-                      )}
+
+                      {profile && isInitialDepositMade && (
+                          <> {/* Fragment untuk menampung elemen-elemen ini */}
+                            <div className="border-b pb-4 mb-4">
+                                <h4 className="font-semibold text-md text-gray-800 mb-2">Catat Setoran Tabungan</h4>
+                                <form id="addSavingForm" className="space-y-4" onSubmit={handleAddSaving}>
+                                    <div>
+                                        <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Jumlah (Rp)</label>
+                                        <input type="text" id="amount" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                            onKeyUp={(e) => {
+                                                let value = e.target.value.replace(/[^0-9]/g, '');
+                                                e.target.value = value ? parseInt(value, 10).toLocaleString('id-ID') : '';
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <button
+                                            type="submit"
+                                            id="saveBtn"
+                                            className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 text-sm font-medium flex items-center justify-center"
+                                            disabled={addSavingLoading}
+                                        >
+                                            {addSavingLoading ? <SmallSpinner /> : null}
+                                            {addSavingLoading ? 'Menyimpan...' : 'Catat Setoran'}
+                                        </button>
+                                    </div>
+                                </form>
+                                <p id="savingMessage" className="text-sm mt-3"></p>
+                            </div>
+
+                            <div className="mb-4 border-b pb-4">
+                                <h4 className="font-semibold text-md text-gray-800 mb-2">Catat Penggunaan Tabungan</h4>
+                                <p className="text-sm text-gray-600 mb-2">Jika sebagian tabungan Anda terpakai untuk keperluan lain.</p>
+                                <form className="space-y-4" onSubmit={handleUseSaving}>
+                                    <div>
+                                        <label htmlFor="usedAmount" className="block text-sm font-medium text-gray-700">Jumlah Terpakai (Rp)</label>
+                                        <input type="text" id="usedAmount" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                            onKeyUp={(e) => {
+                                                let value = e.target.value.replace(/[^0-9]/g, '');
+                                                e.target.value = value ? parseInt(value, 10).toLocaleString('id-ID') : '';
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <button
+                                            type="submit"
+                                            className="w-full bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 text-sm font-medium flex items-center justify-center"
+                                            disabled={useSavingLoading}
+                                        >
+                                            {useSavingLoading ? <SmallSpinner /> : null}
+                                            {useSavingLoading ? 'Mencatat...' : 'Catat Penggunaan'}
+                                        </button>
+                                    </div>
+                                </form>
+                                <p id="usedMessage" className="text-sm mt-3"></p>
+                            </div>
+
+                            {/* Konfirmasi Transfer Dana ke Panitia (hanya ketika total tercatat + setoran awal >= target transfer) */}
+                            {personalTotalRecorded >= (globalConfig?.TargetForTransfer || 0) && ( // Memastikan target transfer tercapai
+                                <div>
+                                    <h4 className="font-semibold text-md text-gray-800 mb-2">Konfirmasi Transfer Dana ke Panitia Qurban</h4>
+                                    <p className="text-sm text-gray-600 mb-2">Unggah bukti transfer dana yang sudah Anda kirim ke rekening panitia. Ini bisa dicicil.</p>
+                                    <form className="space-y-4" onSubmit={handleConfirmTransfer}>
+                                        <div>
+                                            <label htmlFor="transferAmount" className="block text-sm font-medium text-gray-700">Jumlah Transfer (Rp)</label>
+                                            <input type="text" id="transferAmount" required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                                onKeyUp={(e) => {
+                                                    let value = e.target.value.replace(/[^0-9]/g, '');
+                                                    e.target.value = value ? parseInt(value, 10).toLocaleString('id-ID') : '';
+                                                }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label htmlFor="transferProofFile" className="text-sm font-medium text-gray-700">Bukti Transfer (Wajib)</label>
+                                            <input type="file" id="transferProofFile" required className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100" />
+                                        </div>
+                                        <div>
+                                            <button
+                                                type="submit"
+                                                className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 text-sm font-medium flex items-center justify-center"
+                                                disabled={confirmTransferLoading}
+                                            >
+                                                {confirmTransferLoading ? <SmallSpinner /> : null}
+                                                {confirmTransferLoading ? 'Mengunggah...' : 'Kirim Konfirmasi'}
+                                            </button>
+                                        </div>
+                                    </form>
+                                    <p id="confirmMessage" className="text-sm mt-3"></p>
+                                </div>
+                            )}
+                        </>
+                      )} {/* End of profile.IsInitialDepositMade check */}
                   </div>
                 </div>
 
                 {/* Riwayat Tabungan Tercatat (Setoran & Penggunaan) */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                     <h3 className="text-lg font-bold text-gray-900 mb-2">Riwayat Tabungan Tercatat</h3>
-                    <div id="personalHistoryContainer" className="max-h-96 overflow-y-auto pr-2">
-                        {personalSavingHistory.length > 0 ? (
-                            personalSavingHistory.map((item) => (
-                                <div key={item.TransaksiId} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
-                                    <div>
-                                        <p className="font-medium text-sm">
-                                            {item.Tipe === 'Penggunaan' ? '-' : ''}{formatRupiah(item.Jumlah)}
-                                            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${item.Tipe === 'Setoran' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                {item.Tipe}
-                                            </span>
-                                        </p>
-                                        <p className="text-xs text-gray-500">{new Date(item.Tanggal).toLocaleDateString('id-ID')} - {item.Metode || 'Tidak Ada Metode'}</p>
-                                        {item.ProofLink && ( // Bukti hanya untuk Setoran ke Tim
-                                            <a href={item.ProofLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline">Lihat Bukti</a>
-                                        )}
-                                    </div>
-                                    <button onClick={() => showConfirmModal(item.TransaksiId)} className="delete-saving-btn text-red-500 hover:text-red-700 text-xs">Hapus</button>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="text-gray-500 text-sm">Belum ada riwayat tabungan tercatat.</p>
-                        )}
-                    </div>
-                </div>
-
-                {/* Riwayat Konfirmasi Transfer ke Tim (hanya untuk Menabung Sendiri) */}
-                {profile && profile.MetodeTabungan === 'Menabung Sendiri' && (
-                    <div className="bg-white p-6 rounded-xl shadow-lg">
-                        <h3 className="text-lg font-bold mb-2 text-gray-900">Riwayat Konfirmasi Transfer ke Tim</h3>
-                        <div className="max-h-96 overflow-y-auto pr-2">
-                            {personalTransferConfirmations.length > 0 ? (
-                                personalTransferConfirmations.map((item) => (
-                                    <div key={item.ConfirmationId} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
+                    {loadingSections ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
+                        <div id="personalHistoryContainer" className="max-h-96 overflow-y-auto pr-2">
+                            {personalSavingHistory.length > 0 ? (
+                                personalSavingHistory.map((item) => (
+                                    <div key={item.TransaksiId} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
                                         <div>
-                                            <p className="font-medium text-sm">{formatRupiah(item.Amount)}</p>
-                                            <p className="text-xs text-gray-500">{new Date(item.Timestamp).toLocaleDateString('id-ID')} - Status: {item.Status}</p>
-                                            {item.ProofLink && (
+                                            <p className="font-medium text-sm">
+                                                {item.Tipe === 'Penggunaan' ? '-' : ''}{formatRupiah(item.Jumlah)}
+                                                <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${item.Tipe === 'Setoran' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                    {item.Tipe}
+                                                </span>
+                                            </p>
+                                            <p className="text-xs text-gray-500">{new Date(item.Tanggal).toLocaleDateString('id-ID')} - {item.Metode || 'Tidak Ada Metode'}</p>
+                                            {item.ProofLink && ( // Bukti hanya untuk Setoran ke Panitia
                                                 <a href={item.ProofLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline">Lihat Bukti</a>
                                             )}
                                         </div>
+                                        <button onClick={() => showConfirmModal(item.TransaksiId)} className="delete-saving-btn text-red-500 hover:text-red-700 text-xs">Hapus</button>
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-gray-500 text-sm">Belum ada riwayat konfirmasi transfer.</p>
+                                <p className="text-gray-500 text-sm">Belum ada riwayat tabungan tercatat.</p>
                             )}
                         </div>
+                    )}
+                </div>
+
+                {/* Riwayat Konfirmasi Transfer ke Panitia (hanya untuk Menabung Sendiri) */}
+                {profile && profile.MetodeTabungan === 'Menabung Sendiri' && (
+                    <div className="bg-white p-6 rounded-xl shadow-lg">
+                        <h3 className="text-lg font-bold mb-2 text-gray-900">Riwayat Konfirmasi Transfer ke Panitia Qurban</h3>
+                        {loadingSections ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
+                            <div className="max-h-96 overflow-y-auto pr-2">
+                                {personalTransferConfirmations.length > 0 ? (
+                                    personalTransferConfirmations.map((item) => (
+                                        <div key={item.ConfirmationId} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
+                                            <div>
+                                                <p className="font-medium text-sm">{formatRupiah(item.Amount)}</p>
+                                                <p className="text-xs text-gray-500">{new Date(item.Timestamp).toLocaleDateString('id-ID')} - Status: {item.Status}</p>
+                                                {item.ProofLink && (
+                                                    <a href={item.ProofLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline">Lihat Bukti</a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-gray-500 text-sm">Belum ada riwayat konfirmasi transfer.</p>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
               </div> {/* Akhir Kolom Kanan */}
-
- 
             </div>
           )}
         </div>
