@@ -69,6 +69,14 @@ export default function DashboardPage() {
   const [confirmTransferLoading, setConfirmTransferLoading] = useState(false);
   const [helpDeskFormLoading, setHelpDeskFormLoading] = useState(false); // Ganti nama agar tidak konflik dengan loadingSections
 
+  // Loading State untuk setiap section
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [loadingGlobalConfig, setLoadingGlobalConfig] = useState(true);
+  const [loadingPersonal, setLoadingPersonal] = useState(true);
+  const [loadingNews, setLoadingNews] = useState(true);
+  const [loadingMilestones, setLoadingMilestones] = useState(true);
+  const [loadingHelpDeskTickets, setLoadingHelpDeskTickets] = useState(true);
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const currentTab = searchParams.get('tab') || 'main'; // Default tab adalah 'main' dashboard
@@ -100,8 +108,8 @@ export default function DashboardPage() {
   };
 
   // --- Data Fetching Logic ---
-  const fetchAllDashboardData = async () => {
-    setLoadingInitial(true); // Mulai loading awal untuk keseluruhan halaman
+  // Fetch hanya user dan redirect jika belum login
+  const fetchUserAndInit = async () => {
     setError(null);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -110,168 +118,295 @@ export default function DashboardPage() {
         return;
       }
       setUser(user);
+    } catch (err) {
+      setError(err.message || "Terjadi kesalahan yang tidak diketahui.");
+      console.error("Dashboard fetch error - user:", err);
+    }
+  };
 
-      // Fetch Global Config (Initial Load)
-      const { data: configData, error: configError } = await supabase
-          .from('app_config')
-          .select('*')
-          .eq('id', 'global_settings')
-          .single();
-      if (configError || !configData) {
-          throw new Error(configError?.message || 'Data konfigurasi global tidak ditemukan.');
-      }
-      setGlobalConfig(configData);
-
-      // Fetch User Profile (Initial Load)
+  // Fetch section secara terpisah
+  const fetchProfile = async (userId) => {
+    setLoadingProfile(true);
+    try {
       const { data: profileData, error: profileError } = await supabase
         .from('users')
         .select('*, "NamaPequrban", "StatusPequrban", "Benefits", "IsInitialDepositMade"')
-        .eq('UserId', user.id)
+        .eq('UserId', userId)
         .single();
-      if (profileError || !profileData) {
-        throw new Error(profileError?.message || 'Data profil tidak ditemukan.');
-      }
+      if (profileError || !profileData) throw new Error(profileError?.message || 'Data profil tidak ditemukan.');
       setProfile(profileData);
-      
-      // --- Setelah data utama termuat, fetch data sections secara asinkron ---
-      setLoadingSections(true); // Set loading untuk sections
-      await Promise.all([
-        fetchPersonalData(user.id),
-        fetchGlobalContent(),
-        fetchUserHelpDeskTickets(user.id)
-      ]);
-
     } catch (err) {
-      setError(err.message || "Terjadi kesalahan yang tidak diketahui.");
-      console.error("Dashboard fetch error - full object:", err);
+      setError(err.message || "Gagal memuat profil.");
     } finally {
-      setLoadingInitial(false); // Selesai loading awal
-      setLoadingSections(false); // Selesai loading sections
+      setLoadingProfile(false);
     }
   };
 
-  // Fungsi fetch data pribadi (dipecah untuk pembaruan granular)
-  const fetchPersonalData = async (userId) => {
+  const fetchGlobalConfigSection = async () => {
+    setLoadingGlobalConfig(true);
     try {
-        // Fetch Personal Saving History
-        const { data: savingHistoryData, error: savingHistoryError } = await supabase
-          .from('tabungan')
-          .select('*')
-          .eq('UserId', userId)
-          .order('Tanggal', { ascending: false });
-        if (savingHistoryError) throw savingHistoryError;
-        setPersonalSavingHistory(savingHistoryData);
-        
-        let totalRecorded = 0;
-        let totalUsed = 0;
-        savingHistoryData.forEach(item => {
-            if (item.Tipe === 'Setoran') {
-                totalRecorded += (item.Jumlah || 0);
-            } else if (item.Tipe === 'Penggunaan') {
-                totalUsed += (item.Jumlah || 0);
-            }
-        });
-        setPersonalTotalRecorded(totalRecorded);
-        setPersonalUsed(totalUsed);
-
-        // Fetch Personal Transfer Confirmations
-        const { data: transferData, error: transferError } = await supabase
-            .from('transfer_confirmations')
-            .select('*')
-            .eq('UserId', userId)
-            .eq('Status', 'Approved')
-            .order('Timestamp', { ascending: false });
-        if (transferError) throw transferError;
-        setPersonalTransferConfirmations(transferData);
-        setPersonalTransferred(transferData.reduce((sum, item) => sum + (item.Amount || 0), 0));
+      const { data: configData, error: configError } = await supabase
+        .from('app_config')
+        .select('*')
+        .eq('id', 'global_settings')
+        .single();
+      if (configError || !configData) throw new Error(configError?.message || 'Data konfigurasi global tidak ditemukan.');
+      setGlobalConfig(configData);
     } catch (err) {
-        console.error("Error fetching personal data:", err);
-        throw err; // Lempar ulang agar ditangkap oleh fetchAllDashboardData
+      setError(err.message || "Gagal memuat konfigurasi global.");
+    } finally {
+      setLoadingGlobalConfig(false);
     }
   };
 
-  // Fungsi fetch konten global (berita, milestone)
-  const fetchGlobalContent = async () => {
+  const fetchPersonalSection = async (userId) => {
+    setLoadingPersonal(true);
     try {
-        // Fetch News
-        const { data: newsData, error: newsError } = await supabase
-          .from('newsletters')
-          .select('*')
-          .order('DatePublished', { ascending: false })
-          .limit(3);
-        if (newsError) throw newsError;
-        setNews(newsData);
+      // Fetch Personal Saving History
+      const { data: savingHistoryData, error: savingHistoryError } = await supabase
+        .from('tabungan')
+        .select('*')
+        .eq('UserId', userId)
+        .order('Tanggal', { ascending: false });
+      if (savingHistoryError) throw savingHistoryError;
+      setPersonalSavingHistory(savingHistoryData);
 
-        // Fetch Milestones
-        const { data: milestonesData, error: milestonesError } = await supabase
-            .from('program_milestones')
-            .select('*')
-            .order('Year', { ascending: true })
-            .order('Order', { ascending: true });
-        if (milestonesError) {
-            if (milestonesError.code === 'PGRST116') { // Specific code for no rows found
-                setMilestones([]);
-            } else {
-                throw milestonesError;
-            }
-        } else {
-            setMilestones(milestonesData);
-        }
+      let totalRecorded = 0;
+      let totalUsed = 0;
+      savingHistoryData.forEach(item => {
+        if (item.Tipe === 'Setoran') totalRecorded += (item.Jumlah || 0);
+        else if (item.Tipe === 'Penggunaan') totalUsed += (item.Jumlah || 0);
+      });
+      setPersonalTotalRecorded(totalRecorded);
+      setPersonalUsed(totalUsed);
+
+      // Fetch Personal Transfer Confirmations
+      const { data: transferData, error: transferError } = await supabase
+        .from('transfer_confirmations')
+        .select('*')
+        .eq('UserId', userId)
+        .eq('Status', 'Approved')
+        .order('Timestamp', { ascending: false });
+      if (transferError) throw transferError;
+      setPersonalTransferConfirmations(transferData);
+      setPersonalTransferred(transferData.reduce((sum, item) => sum + (item.Amount || 0), 0));
     } catch (err) {
-        console.error("Error fetching global content:", err);
-        throw err;
+      setError(err.message || "Gagal memuat data pribadi.");
+    } finally {
+      setLoadingPersonal(false);
     }
   };
 
-  // Fungsi fetch tiket Help Desk user
-  const fetchUserHelpDeskTickets = async (userId) => {
+const [newsPage, setNewsPage] = useState(1);
+const [newsTotal, setNewsTotal] = useState(0);
+const NEWS_PER_PAGE = 3;
+
+const fetchNewsSection = async (page = 1) => {
+  setLoadingNews(true);
+  try {
+    const offset = (page - 1) * NEWS_PER_PAGE;
+    const { data: newsData, error: newsError, count } = await supabase
+      .from('newsletters')
+      .select('*', { count: 'exact' })
+      .order('DatePublished', { ascending: false })
+      .range(offset, offset + NEWS_PER_PAGE - 1);
+    if (newsError) throw newsError;
+    setNews(newsData);
+    setNewsTotal(count); // Tambahkan state untuk total berita jika ingin tampilkan total halaman
+  } catch (err) {
+    setError(err.message || "Gagal memuat berita.");
+  } finally {
+    setLoadingNews(false);
+  }
+};
+
+
+
+
+  const fetchMilestonesSection = async () => {
+    setLoadingMilestones(true);
     try {
-        const { data: ticketsData, error: ticketsError } = await supabase
-            .from('help_desk_tickets')
-            .select('*')
-            .eq('UserId', userId)
-            .order('Timestamp', { ascending: false });
-        
-        if (ticketsError) throw ticketsError;
-        setUserHelpDeskTickets(ticketsData);
+      const { data: milestonesData, error: milestonesError } = await supabase
+        .from('program_milestones')
+        .select('*')
+        .order('Year', { ascending: true })
+        .order('Order', { ascending: true });
+      if (milestonesError) {
+        if (milestonesError.code === 'PGRST116') setMilestones([]);
+        else throw milestonesError;
+      } else {
+        setMilestones(milestonesData);
+      }
     } catch (err) {
-        console.error("Error fetching help desk tickets:", err);
-        throw err;
+      setError(err.message || "Gagal memuat milestone.");
+    } finally {
+      setLoadingMilestones(false);
     }
   };
 
+  const fetchHelpDeskTicketsSection = async (userId) => {
+    setLoadingHelpDeskTickets(true);
+    try {
+      const { data: ticketsData, error: ticketsError } = await supabase
+        .from('help_desk_tickets')
+        .select('*')
+        .eq('UserId', userId)
+        .order('Timestamp', { ascending: false });
+      if (ticketsError) throw ticketsError;
+      setUserHelpDeskTickets(ticketsData);
+    } catch (err) {
+      setError(err.message || "Gagal memuat tiket helpdesk.");
+    } finally {
+      setLoadingHelpDeskTickets(false);
+    }
+  };
 
-  useEffect(() => {
-    // Hanya panggil fetchAllDashboardData saat komponen mount atau ketika user/router/searchParams berubah
-    fetchAllDashboardData();
+  // Initial effect: hanya cek user, lalu fetch section data
+useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      // Cek apakah cache masih ada
+      const cached = sessionStorage.getItem('dashboardCache');
+      if (cached) {
+        // Jangan fetch ulang, cukup update state dari cache
+        const cacheData = JSON.parse(cached);
+        setUser(cacheData.user);
+        setProfile(cacheData.profile);
+        setGlobalConfig(cacheData.globalConfig);
+        setPersonalTotalRecorded(cacheData.personalTotalRecorded);
+        setPersonalUsed(cacheData.personalUsed);
+        setPersonalTransferred(cacheData.personalTransferred);
+        setPersonalSavingHistory(cacheData.personalSavingHistory);
+        setPersonalTransferConfirmations(cacheData.personalTransferConfirmations);
+        setUserHelpDeskTickets(cacheData.userHelpDeskTickets);
+        setNews(cacheData.news);
+        setMilestones(cacheData.milestones);
+        setLoadingProfile(false);
+        setLoadingGlobalConfig(false);
+        setLoadingPersonal(false);
+        setLoadingNews(false);
+        setLoadingMilestones(false);
+        setLoadingHelpDeskTickets(false);
+        setLoadingInitial(false);
+      }
+      // Jika cache tidak ada, baru fetch ulang
+      // else { fetchUserAndInit(); }
+    }
+  };
 
-    // Listener untuk perubahan status autentikasi
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (!session) {
-            router.push('/login');
-        } else {
-            setUser(session.user);
-            fetchAllDashboardData(); // Re-fetch all data if auth state changes (e.g., user logs in/out)
-        }
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  return () => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+  };
+}, []);
+
+
+useEffect(() => {
+  // Jika user baru login, paksa refresh dashboard
+  if (user && (!sessionStorage.getItem('dashboardCache') || sessionStorage.getItem('dashboardCache') === 'null')) {
+    handleRefreshDashboard();
+  }
+}, [user]);
+
+  // Fetch section data setelah user tersedia
+useEffect(() => {
+  // Cek cache dulu sebelum fetch
+  const cached = sessionStorage.getItem('dashboardCache');
+  // Jika user sudah login dan cache belum ada, fetch data
+  if (user && (!cached || cached === 'null')) {
+    Promise.all([
+      fetchProfile(user.id),
+      fetchGlobalConfigSection(),
+      fetchPersonalSection(user.id),
+      fetchNewsSection(),
+      fetchMilestonesSection(),
+      fetchHelpDeskTicketsSection(user.id),
+    ]).then(() => {
+      const dashboardCache = {
+        user,
+        profile,
+        globalConfig,
+        personalTotalRecorded,
+        personalUsed,
+        personalTransferred,
+        personalSavingHistory,
+        personalTransferConfirmations,
+        userHelpDeskTickets,
+        news,
+        milestones,
+      };
+      sessionStorage.setItem('dashboardCache', JSON.stringify(dashboardCache));
     });
+  }
+}, [user, router, searchParams]);
 
+
+useEffect(() => {
+    if (user) {
+      const dashboardCache = {
+        user,
+        profile,
+        globalConfig,
+        personalTotalRecorded,
+        personalUsed,
+        personalTransferred,
+        personalSavingHistory,
+        personalTransferConfirmations,
+        userHelpDeskTickets,
+        news,
+        milestones,
+      };
+      sessionStorage.setItem('dashboardCache', JSON.stringify(dashboardCache));
+    }
+  }, [
+    user,
+    profile,
+    globalConfig,
+    personalTotalRecorded,
+    personalUsed,
+    personalTransferred,
+    personalSavingHistory,
+    personalTransferConfirmations,
+    userHelpDeskTickets,
+    news,
+    milestones
+  ]);
+  // --- Akhir kode tambahan ---
+
+
+  // Listener untuk perubahan status autentikasi
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        router.push('/login');
+      } else {
+        setUser(session.user);
+      }
+    });
     return () => {
-        authListener.subscription.unsubscribe();
+      authListener.subscription.unsubscribe();
     };
-  }, [router, searchParams]); // searchParams untuk memicu refresh jika tab berubah
+  }, [router]);
+ 
+useEffect(() => {
+  fetchNewsSection(newsPage);
+}, [newsPage]);
+
 
   // --- Event Handlers ---
-  const handleSignOut = async () => {
-    setLoadingInitial(true); // Set loading for full page transition
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      console.error('Error signing out:', error.message);
-      setError('Gagal logout: ' + error.message);
-    } else {
-      router.push('/login');
-    }
-    setLoadingInitial(false);
-  };
+const handleSignOut = async () => {
+  setLoadingInitial(true); // Set loading for full page transition
+  // Hapus cache dashboard dari sessionStorage
+  sessionStorage.removeItem('dashboardCache');
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    console.error('Error signing out:', error.message);
+    setError('Gagal logout: ' + error.message);
+  } else {
+    router.push('/login');
+  }
+  setLoadingInitial(false);
+};
 
   const handleAddSaving = async (e) => {
     e.preventDefault();
@@ -696,16 +831,21 @@ export default function DashboardPage() {
     }
   };
 
+  // Fungsi refresh dashboard (fetch semua section)
+  const handleRefreshDashboard = () => {
+    if (user) {
+      fetchProfile(user.id);
+      fetchGlobalConfigSection();
+      fetchPersonalSection(user.id);
+      fetchNewsSection();
+      fetchMilestonesSection();
+      fetchHelpDeskTicketsSection(user.id);
+    }
+  };
+
   // --- Render Logic ---
-  // Initial loading overlay for the entire page
-  if (loadingInitial) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="spinner"></div> {/* Spinner utama di tengah layar */}
-        <p className="ml-4 text-gray-700">Memuat dashboard...</p>
-      </div>
-    );
-  }
+  // Hapus overlay loadingInitial, tampilkan page langsung
+  // Tampilkan skeleton loader/icon loading pada setiap section
 
   if (error) return <div className="text-center mt-10 text-red-500">Error: {error}</div>;
 
@@ -743,7 +883,7 @@ export default function DashboardPage() {
             
             {/* Tombol Refresh Data */}
             <button
-                onClick={fetchAllDashboardData} // Memanggil fetchAllDashboardData untuk refresh
+                onClick={handleRefreshDashboard} // Ganti ke fungsi baru
                 className="text-sm font-medium text-gray-600 hover:text-green-700 flex items-center space-x-1"
                 title="Refresh Data"
             >
@@ -806,7 +946,7 @@ export default function DashboardPage() {
                     {/* Riwayat Tiket User */}
                     <div className="mt-8">
                         <h4 className="font-semibold text-md text-gray-800 mb-2">Riwayat Pertanyaan Anda</h4>
-                        {loadingSections ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
+                        {loadingHelpDeskTickets ? <ListSkeleton /> : (
                             <div className="max-h-60 overflow-y-auto pr-2">
                                 {userHelpDeskTickets.length > 0 ? (
                                     userHelpDeskTickets.map((ticket) => (
@@ -843,9 +983,17 @@ export default function DashboardPage() {
                     </div>
                 </div>
                 <div className="mt-6 text-center">
-                    <a href="/dashboard" className="text-indigo-600 hover:text-indigo-800 font-medium">
+                      <a
+                        href="/dashboard"
+                        className="text-indigo-600 hover:text-indigo-800 font-medium"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          router.push('/dashboard');
+                          handleRefreshDashboard();
+                        }}
+                      >
                         &larr; Kembali ke Dashboard Utama
-                    </a>
+                      </a>
                 </div>
             </div>
           ) : (
@@ -856,7 +1004,7 @@ export default function DashboardPage() {
                 {/* Profil Pequrban Card */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                   <h2 className="text-xl font-bold mb-4 text-gray-800">Profil Pequrban</h2>
-                  {loadingSections ? <CardSkeleton /> : (
+                  {loadingProfile ? <CardSkeleton /> : (
                       profile && (
                           <div className="space-y-2 text-sm text-gray-700">
                             <p><strong>Nama Pequrban:</strong> {profile.NamaPequrban || profile.Nama}</p>
@@ -881,7 +1029,7 @@ export default function DashboardPage() {
                 {/* Personal Progress Card */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                   <h2 className="text-xl font-bold mb-4 text-green-800">Capaian Pribadi Anda</h2>
-                  {loadingSections ? <CardSkeleton /> : (
+                  {loadingPersonal ? <CardSkeleton /> : (
                       <div id="personal-progress-container">
                         <div className="relative pt-1">
                           <div className="flex mb-2 items-center justify-between">
@@ -947,7 +1095,7 @@ export default function DashboardPage() {
                 {/* Milestone Program Card */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                     <h2 className="text-xl font-bold mb-4 text-gray-800">Milestone Program</h2>
-                    {loadingSections ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
+                    {loadingMilestones ? <ListSkeleton /> : (
                         <div className="overflow-x-auto">
                             <div className="flex space-x-4 pb-2 min-w-max">
                                 {milestones && milestones.length > 0 ? (
@@ -990,7 +1138,7 @@ export default function DashboardPage() {
                 {/* News Card */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                     <h2 className="text-xl font-bold mb-4 text-gray-800">Berita & Informasi Terbaru</h2>
-                    {loadingSections ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
+                    {loadingNews ? <ListSkeleton /> : (
                         <div id="newsContainer" className="space-y-4">
                             {news.length > 0 ? (
                                 news.map((item) => (
@@ -1135,7 +1283,7 @@ export default function DashboardPage() {
                 {/* Riwayat Tabungan Tercatat (Setoran & Penggunaan) */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                     <h3 className="text-lg font-bold text-gray-900 mb-2">Riwayat Tabungan Tercatat</h3>
-                    {loadingSections ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
+                    {loadingPersonal ? <ListSkeleton /> : (
                         <div id="personalHistoryContainer" className="max-h-96 overflow-y-auto pr-2">
                             {personalSavingHistory.length > 0 ? (
                                 personalSavingHistory.map((item) => (
@@ -1166,7 +1314,7 @@ export default function DashboardPage() {
                 {profile && profile.MetodeTabungan === 'Menabung Sendiri' && (
                     <div className="bg-white p-6 rounded-xl shadow-lg">
                         <h3 className="text-lg font-bold mb-2 text-gray-900">Riwayat Konfirmasi Transfer ke Panitia Qurban</h3>
-                        {loadingSections ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
+                        {loadingPersonal ? <ListSkeleton /> : (
                             <div className="max-h-96 overflow-y-auto pr-2">
                                 {personalTransferConfirmations.length > 0 ? (
                                     personalTransferConfirmations.map((item) => (
