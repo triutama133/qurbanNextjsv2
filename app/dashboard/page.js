@@ -443,24 +443,42 @@ const handleSignOut = async () => {
       return;
     }
 
-    // Metode 'Setor ke Tim' sudah dihapus dari register, jadi ini mungkin tidak relevan
-    // tetapi kita pertahankan validasi file jika ada fitur serupa di masa depan.
-    if (profile?.MetodeTabungan === 'Setor ke Tim' && !e.target.elements.proofFile?.files[0]) {
-      savingMessageEl.textContent = 'Bukti setor wajib diunggah untuk metode ini.';
-      savingMessageEl.className = 'text-sm mt-3 text-red-600';
-      setAddSavingLoading(false);
-      return;
+    let proofUrl = null;
+    // HANYA JIKA metode Setor ke Tim yang aktif (yang Anda hapus dari register)
+    // Jika Anda berencana mengaktifkannya lagi di masa depan, validasi ini relevan.
+    if (profile?.MetodeTabungan === 'Setor ke Tim') { // Check metode here
+        const proofFile = e.target.elements.proofFile?.files[0];
+        if (!proofFile) {
+            savingMessageEl.textContent = 'Bukti setor wajib diunggah untuk metode ini.';
+            savingMessageEl.className = 'text-sm mt-3 text-red-600';
+            setAddSavingLoading(false);
+            return;
+        }
+        try {
+            const fileData = {
+                name: proofFile.name,
+                mimeType: proofFile.type,
+                data: await readFileAsBase64(proofFile)
+            };
+            const uploadResponse = await fetch('/api/upload-file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(fileData),
+            });
+            const uploadResult = await uploadResponse.json();
+            if (!uploadResponse.ok || uploadResult.error) {
+                throw new Error(uploadResult.error || 'Gagal mengunggah bukti.');
+            }
+            proofUrl = uploadResult.fileUrl;
+        } catch (uploadErr) {
+            throw new Error(`Gagal mengunggah bukti: ${uploadErr.message}`);
+        }
     }
+
 
     try {
       savingMessageEl.textContent = 'Menyimpan...';
       savingMessageEl.className = 'text-sm mt-3 text-gray-600';
-
-      let proofUrl = null;
-      if (profile?.MetodeTabungan === 'Setor ke Tim' && e.target.elements.proofFile?.files[0]) {
-        console.warn("Upload file proof: Implementasi API Route '/api/upload-file' masih diperlukan.");
-        proofUrl = `dummy_setor_tim_url_${Date.now()}`;
-      }
 
       const newTransactionId = `TRX-${Date.now()}`;
       const newTanggal = new Date().toISOString();
@@ -475,7 +493,7 @@ const handleSignOut = async () => {
           "Tanggal": newTanggal,
           "Tipe": "Setoran",
           "Status": "Confirmed",
-          "ProofLink": proofUrl,
+          "ProofLink": proofUrl, // Gunakan proofUrl yang sebenarnya
           "VerificationStatus": null, // Tidak ada verifikasi untuk Menabung Sendiri
         });
 
@@ -501,6 +519,7 @@ const handleSignOut = async () => {
       savingMessageEl.textContent = 'Tabungan berhasil dicatat!';
       savingMessageEl.className = 'text-sm mt-3 text-green-600';
       e.target.reset();
+      // fetchAllDashboardData(); // Tidak perlu full refresh lagi
 
     } catch (err) {
       console.error('Error adding saving:', err.message);
@@ -583,7 +602,7 @@ const handleSignOut = async () => {
     }
   };
 
-  const handleInitialDeposit = async (e) => {
+    const handleInitialDeposit = async (e) => {
     e.preventDefault();
     // Anda bisa menambahkan loading state khusus untuk form ini jika diperlukan
     const initialProofFile = e.target.elements.initialProofFile?.files[0];
@@ -599,11 +618,27 @@ const handleSignOut = async () => {
         initialMessageEl.textContent = 'Mengunggah bukti & Mencatat Setoran Awal...';
         initialMessageEl.className = 'text-sm mt-3 text-gray-600';
         
-        // Simulasikan upload file
-        console.warn("Upload file proof (initial deposit): Implementasi API Route '/api/upload-file' masih diperlukan.");
-        const proofUrl = `dummy_initial_url_${Date.now()}`;
-
+        // --- FIX: Inisialisasi newTransactionId sebelum fileData ---
         const newTransactionId = `INIT-${Date.now()}`;
+        const fileData = {
+            name: initialProofFile.name,
+            mimeType: initialProofFile.type,
+            data: await readFileAsBase64(initialProofFile),
+            userId: user.id,
+            transactionId: newTransactionId
+        };
+        const uploadResponse = await fetch('/api/upload-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(fileData),
+        });
+        const uploadResult = await uploadResponse.json();
+        if (!uploadResponse.ok || uploadResult.error) {
+            throw new Error(uploadResult.error || 'Gagal mengunggah bukti setoran awal.');
+        }
+        const proofUrl = uploadResult.fileUrl; // Ambil URL sebenarnya
+
+
         const newTanggal = new Date().toISOString();
 
         const { data: savingData, error: savingError } = await supabase
@@ -617,7 +652,7 @@ const handleSignOut = async () => {
                 "Tipe": "Setoran",
                 "Status": "Confirmed",
                 "ProofLink": proofUrl,
-                "VerificationStatus": "Pending", // Setoran awal mungkin juga perlu verifikasi admin
+                "VerificationStatus": "Pending", // Setoran awal juga butuh verifikasi admin
             });
 
         if (savingError) {
@@ -627,7 +662,7 @@ const handleSignOut = async () => {
         // Update status IsInitialDepositMade di public.users
         const { error: updateError } = await supabase
             .from('users')
-            .update({ "IsInitialDepositMade": true })
+            .update({ "IsInitialDepositMade": true, "InitialDepositStatus": "Pending" }) // Update status verifikasi
             .eq('UserId', user.id);
 
         if (updateError) {
@@ -638,7 +673,7 @@ const handleSignOut = async () => {
         initialMessageEl.className = 'text-sm mt-3 text-green-600';
         e.target.reset();
         // Update profile state secara granular
-        setProfile(prevProfile => ({ ...prevProfile, IsInitialDepositMade: true }));
+        setProfile(prevProfile => ({ ...prevProfile, IsInitialDepositMade: true, InitialDepositStatus: "Pending" }));
         // Update riwayat dan total tercatat
         setPersonalSavingHistory(prev => [{
             "TransaksiId": newTransactionId,
@@ -668,25 +703,19 @@ const handleSignOut = async () => {
     const transferProofFile = e.target.elements.transferProofFile?.files[0];
     const confirmMessageEl = document.getElementById('confirmMessage');
 
-    const currentAvailableSavingForTransfer = personalTotalRecorded - personalUsed - personalTransferred;
+    const currentAvailableSavingForTransfer = personalTotalRecorded - personalUsed + personalTransferred;
 
-    if (isNaN(transferAmount) || transferAmount <= 0) {
-        confirmMessageEl.textContent = 'Jumlah transfer tidak valid.';
-        confirmMessageEl.className = 'text-sm mt-3 text-red-600';
-        setConfirmTransferLoading(false);
-        return;
-    }
-    if (transferAmount > currentAvailableSavingForTransfer) {
-        confirmMessageEl.textContent = `Jumlah transfer melebihi dana bersih tersedia (${formatRupiah(currentAvailableSavingForTransfer)}).`;
-        confirmMessageEl.className = 'text-sm mt-3 text-red-600';
-        setConfirmTransferLoading(false);
-        return;
-    }
-    if (!transferProofFile) {
-        confirmMessageEl.textContent = 'Bukti transfer wajib diunggah.';
-        confirmMessageEl.className = 'text-sm mt-3 text-red-600';
-        setConfirmTransferLoading(false);
-        return;
+      if (currentAvailableSavingForTransfer < 2650000) {
+          confirmMessageEl.textContent = 'Dana Sisa Tabungan belum mencapai Rp 2.650.000.';
+          confirmMessageEl.className = 'text-sm mt-3 text-red-600';
+          setConfirmTransferLoading(false);
+          return;
+      }
+      if (transferAmount !== 2650000) {
+          confirmMessageEl.textContent = 'Jumlah transfer harus tepat Rp 2.650.000.';
+          confirmMessageEl.className = 'text-sm mt-3 text-red-600';
+          setConfirmTransferLoading(false);
+          return;
     }
 
     // Validasi target transfer
@@ -699,52 +728,68 @@ const handleSignOut = async () => {
     }
 
     try {
-        confirmMessageEl.textContent = 'Mengunggah bukti transfer...';
-        confirmMessageEl.className = 'text-sm mt-3 text-gray-600';
+      confirmMessageEl.textContent = 'Mengunggah bukti transfer...';
+      confirmMessageEl.className = 'text-sm mt-3 text-gray-600';
 
-        console.warn("Upload file proof (transfer): Implementasi API Route '/api/upload-file' masih diperlukan.");
-        const proofUrl = `dummy_transfer_url_${Date.now()}`;
+      // --- FIX: Inisialisasi newConfirmationId sebelum fileData ---
+      const newConfirmationId = `CONF-${Date.now()}`;
+      const fileData = {
+        name: transferProofFile.name,
+        mimeType: transferProofFile.type,
+        data: await readFileAsBase64(transferProofFile),
+        userId: user.id,
+        transactionId: newConfirmationId
+      };
+      const uploadResponse = await fetch('/api/upload-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fileData),
+      });
+      const uploadResult = await uploadResponse.json();
+      if (!uploadResponse.ok || uploadResult.error) {
+        throw new Error(uploadResult.error || 'Gagal mengunggah bukti.');
+      }
+      const proofUrl = uploadResult.fileUrl; // Ambil URL sebenarnya
 
-        const newConfirmationId = `CONF-${Date.now()}`;
-        const newTimestamp = new Date().toISOString();
+      const newTimestamp = new Date().toISOString();
 
-        const { data, error } = await supabase
-            .from('transfer_confirmations')
-            .insert({
-                "ConfirmationId": newConfirmationId,
-                "UserId": user.id,
-                "Amount": transferAmount,
-                "ProofLink": proofUrl,
-                "Timestamp": newTimestamp,
-                "Status": "Pending",
-                "Notes": "Konfirmasi transfer cicilan pribadi"
-            });
+      const { data, error } = await supabase
+        .from('transfer_confirmations')
+        .insert({
+          "ConfirmationId": newConfirmationId,
+          "UserId": user.id,
+          "Amount": transferAmount,
+          "ProofLink": proofUrl,
+          "Timestamp": newTimestamp,
+          "Status": "Pending",
+          "Notes": "Konfirmasi transfer cicilan pribadi"
+        });
 
-        if (error) {
-            throw error;
-        }
+      if (error) {
+        throw error;
+      }
 
-        setPersonalTransferConfirmations(prev => [{
-            "ConfirmationId": newConfirmationId,
-            "UserId": user.id,
-            "Amount": transferAmount,
-            "ProofLink": proofUrl,
-            "Timestamp": newTimestamp,
-            "Status": "Pending",
-            "Notes": "Konfirmasi transfer cicilan pribadi",
-        }, ...prev].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)));
-        // personalTransferred tidak diupdate karena statusnya masih Pending (menunggu verifikasi admin)
+      setPersonalTransferConfirmations(prev => [{
+        "ConfirmationId": newConfirmationId,
+        "UserId": user.id,
+        "Amount": transferAmount,
+        "ProofLink": proofUrl,
+        "Timestamp": newTimestamp,
+        "Status": "Pending",
+        "Notes": "Konfirmasi transfer cicilan pribadi",
+      }, ...prev].sort((a,b) => new Date(b.Timestamp) - new Date(a.Timestamp)));
+      // personalTransferred tidak diupdate karena statusnya masih Pending (menunggu verifikasi admin)
 
-        confirmMessageEl.textContent = 'Konfirmasi transfer berhasil dikirim. Menunggu verifikasi admin.';
-        confirmMessageEl.className = 'text-sm mt-3 text-green-600';
-        e.target.reset();
+      confirmMessageEl.textContent = 'Konfirmasi transfer berhasil dikirim. Menunggu verifikasi admin.';
+      confirmMessageEl.className = 'text-sm mt-3 text-green-600';
+      e.target.reset();
 
     } catch (err) {
-        console.error('Error confirming transfer:', err.message);
-        confirmMessageEl.textContent = 'Gagal mengirim konfirmasi transfer: ' + err.message;
-        confirmMessageEl.className = 'text-sm mt-3 text-red-600';
+      console.error('Error confirming transfer:', err.message);
+      confirmMessageEl.textContent = 'Gagal mengirim konfirmasi transfer: ' + err.message;
+      confirmMessageEl.className = 'text-sm mt-3 text-red-600';
     } finally {
-        setConfirmTransferLoading(false);
+      setConfirmTransferLoading(false);
     }
   };
 
@@ -853,6 +898,7 @@ const handleSignOut = async () => {
   };
 
   // Fungsi refresh dashboard (fetch semua section)
+  // Perbaiki dengan menggunakan fungsi fetch section yang sudah ada
   const handleRefreshDashboard = () => {
     if (user) {
       fetchProfile(user.id);
@@ -864,24 +910,22 @@ const handleSignOut = async () => {
     }
   };
 
+
   // --- Render Logic ---
-  // Hapus overlay loadingInitial, tampilkan page langsung
-  // Tampilkan skeleton loader/icon loading pada setiap section
+  // Initial loading overlay for the entire page
+if (loadingInitial) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <svg className="animate-spin h-12 w-12 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+    </div>
+  );
+}
 
   if (error) return <div className="text-center mt-10 text-red-500">Error: {error}</div>;
 
-  if (loadingInitial) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <CardSkeleton />
-      </div>
-    );
-  }
-
-  // --- Tambahkan deklarasi ini sebelum blok render ---
-  const isInitialDepositMade = profile?.IsInitialDepositMade;
-
-  // --- Tambahkan deklarasi rekomendasiTabungPerBulan ---
   // Rekomendasi Tabung Per Bulan
   const targetDateGlobal = globalConfig?.TanggalTargetQurban ? new Date(globalConfig.TanggalTargetQurban) : null;
   const today = new Date();
@@ -895,6 +939,14 @@ const handleSignOut = async () => {
         rekomendasiTabungPerBulan = remainingToTarget / remainingMonths;
     }
   }
+
+  // --- Tambahkan deklarasi totalNewsPages sebelum render News Card ---
+  const totalNewsPages = Math.max(1, Math.ceil(newsTotal / NEWS_PER_PAGE));
+
+  // --- Cek Status Setoran Awal ---
+  const isInitialDepositMade = profile?.IsInitialDepositMade;
+  // const isTargetForTransferReached = personalTotalRecorded >= (globalConfig?.TargetForTransfer || 0); // Sudah dicek di handler
+  
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -911,7 +963,7 @@ const handleSignOut = async () => {
             
             {/* Tombol Refresh Data */}
             <button
-                onClick={handleRefreshDashboard} // Ganti ke fungsi baru
+                onClick={handleRefreshDashboard} // Memanggil handleRefreshDashboard
                 className="text-sm font-medium text-gray-600 hover:text-green-700 flex items-center space-x-1"
                 title="Refresh Data"
             >
@@ -1011,23 +1063,15 @@ const handleSignOut = async () => {
                     </div>
                 </div>
                 <div className="mt-6 text-center">
-                      <a
-                        href="/dashboard"
-                        className="text-indigo-600 hover:text-indigo-800 font-medium"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          router.push('/dashboard');
-                          handleRefreshDashboard();
-                        }}
-                      >
+                    <a href="/dashboard" className="text-indigo-600 hover:text-indigo-800 font-medium">
                         &larr; Kembali ke Dashboard Utama
-                      </a>
+                    </a>
                 </div>
             </div>
           ) : (
             // Tampilan Dashboard Utama jika tab bukan Help Desk
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Kolom Kiri (2/3 lebar di layar besar): Profil, Capaian Pribadi, Milestone, Berita */}
+              {/* Kolom Kiri (2/3 lebar di layar besar): Profil Pequrban, Capaian Pribadi, Milestone, Berita */}
               <div className="lg:col-span-2 space-y-6"> 
                 {/* Profil Pequrban Card */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
@@ -1123,7 +1167,7 @@ const handleSignOut = async () => {
                 {/* Milestone Program Card */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                     <h2 className="text-xl font-bold mb-4 text-gray-800">Milestone Program</h2>
-                    {loadingMilestones ? <ListSkeleton /> : (
+                    {loadingMilestones ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
                         <div className="overflow-x-auto">
                             <div className="flex space-x-4 pb-2 min-w-max">
                                 {milestones && milestones.length > 0 ? (
@@ -1169,44 +1213,46 @@ const handleSignOut = async () => {
                     {loadingNews ? <ListSkeleton /> : (
                         <div id="newsContainer" className="space-y-4">
                             {news.length > 0 ? (
-                                news.map((item) => (
-                                    <article key={item.NewsletterId} className="border-t border-gray-200 pt-4 first:border-t-0 first:pt-0">
-                                        {item.FotoLinks && item.FotoLinks.length > 0 && (
-                                            <img src={item.FotoLinks[0]} alt={item.Title} className="w-full h-40 object-cover rounded-md mb-2" />
-                                        )}
-                                        <h3 className="text-lg font-semibold text-gray-900">{item.Title}</h3>
-                                        <p className="text-xs text-gray-500 mb-2">Oleh {item.AuthorName} - {new Date(item.DatePublished).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                        <div className="text-sm text-gray-600">
-                                            {item.Content.substring(0, 150)}{item.Content.length > 150 ? '...' : ''}
+                                <>
+                                    {news.map((item) => (
+                                        <article key={item.NewsletterId} className="border-t border-gray-200 pt-4 first:border-t-0 first:pt-0">
+                                            {item.FotoLinks && item.FotoLinks.length > 0 && (
+                                                <img src={item.FotoLinks[0]} alt={item.Title} className="w-full h-40 object-cover rounded-md mb-2" />
+                                            )}
+                                            <h3 className="text-lg font-semibold text-gray-900">{item.Title}</h3>
+                                            <p className="text-xs text-gray-500 mb-2">Oleh {item.AuthorName} - {new Date(item.DatePublished).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                                            <div className="text-sm text-gray-600">
+                                                {item.Content.substring(0, 150)}{item.Content.length > 150 ? '...' : ''}
+                                            </div>
+                                        </article>
+                                    ))}
+                                    {/* Pagination Controls */}
+                                    {totalNewsPages > 1 && (
+                                        <div className="flex justify-between mt-4">
+                                            <button
+                                                onClick={() => setNewsPage(prev => Math.max(1, prev - 1))}
+                                                disabled={newsPage === 1}
+                                                className="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Sebelumnya
+                                            </button>
+                                            <span className="text-sm text-gray-700">Halaman {newsPage} dari {totalNewsPages}</span>
+                                            <button
+                                                onClick={() => setNewsPage(prev => Math.min(totalNewsPages, prev + 1))}
+                                                disabled={newsPage === totalNewsPages}
+                                                className="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Berikutnya
+                                            </button>
                                         </div>
-                                    </article>
-                                ))
+                                    )}
+                                </>
                             ) : (
                                 <p className="text-gray-500 text-sm">Belum ada berita terbaru.</p>
-                                      )}
-                                      {/* Pagination Controls */}
-                                      <div className="flex justify-between items-center mt-4">
-                                        <button
-                                          disabled={newsPage === 1}
-                                          onClick={() => setNewsPage(newsPage - 1)}
-                                          className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
-                                        >
-                                          Sebelumnya
-                                        </button>
-                                        <span className="text-sm text-gray-600">
-                                          Halaman {newsPage} dari {Math.ceil(newsTotal / NEWS_PER_PAGE)}
-                                        </span>
-                                        <button
-                                          disabled={newsPage >= Math.ceil(newsTotal / NEWS_PER_PAGE)}
-                                          onClick={() => setNewsPage(newsPage + 1)}
-                                          className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
-                                        >
-                                          Berikutnya
-                                        </button>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
               </div>
 
               {/* Kolom Kanan: Pencatatan Transaksi, Riwayat */}
@@ -1291,10 +1337,10 @@ const handleSignOut = async () => {
                             </div>
 
                             {/* Konfirmasi Transfer Dana ke Panitia (hanya ketika total tercatat + setoran awal >= target transfer) */}
-                            {personalTotalRecorded >= (globalConfig?.TargetForTransfer || 0) && ( // Memastikan target transfer tercapai
+                            {(personalTotalRecorded - personalUsed) >= 2650000 && ( // Memastikan target transfer tercapai
                                 <div>
                                     <h4 className="font-semibold text-md text-gray-800 mb-2">Konfirmasi Transfer Dana ke Panitia Qurban</h4>
-                                    <p className="text-sm text-gray-600 mb-2">Unggah bukti transfer dana yang sudah Anda kirim ke rekening panitia. Ini bisa dicicil.</p>
+                                    <p className="text-sm text-gray-600 mb-2">Unggah bukti transfer dana yang sudah Anda kirim ke rekening panitia.</p>
                                     <form className="space-y-4" onSubmit={handleConfirmTransfer}>
                                         <div>
                                             <label htmlFor="transferAmount" className="block text-sm font-medium text-gray-700">Jumlah Transfer (Rp)</label>
@@ -1331,7 +1377,7 @@ const handleSignOut = async () => {
                 {/* Riwayat Tabungan Tercatat (Setoran & Penggunaan) */}
                 <div className="bg-white p-6 rounded-xl shadow-lg">
                     <h3 className="text-lg font-bold text-gray-900 mb-2">Riwayat Tabungan Tercatat</h3>
-                    {loadingPersonal ? <ListSkeleton /> : (
+                    {loadingPersonal ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
                         <div id="personalHistoryContainer" className="max-h-96 overflow-y-auto pr-2">
                             {personalSavingHistory.length > 0 ? (
                                 personalSavingHistory.map((item) => (
@@ -1362,7 +1408,7 @@ const handleSignOut = async () => {
                 {profile && profile.MetodeTabungan === 'Menabung Sendiri' && (
                     <div className="bg-white p-6 rounded-xl shadow-lg">
                         <h3 className="text-lg font-bold mb-2 text-gray-900">Riwayat Konfirmasi Transfer ke Panitia Qurban</h3>
-                        {loadingPersonal ? <ListSkeleton /> : (
+                        {loadingPersonal ? <ListSkeleton /> : ( // Menggunakan ListSkeleton
                             <div className="max-h-96 overflow-y-auto pr-2">
                                 {personalTransferConfirmations.length > 0 ? (
                                     personalTransferConfirmations.map((item) => (
