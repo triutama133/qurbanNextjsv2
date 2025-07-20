@@ -287,15 +287,8 @@ useEffect(() => {
         setLoadingHelpDeskTickets(false);
         setLoadingInitial(false);
 
-        // --- Tambahan: fetch ulang data section agar tidak stuck di skeleton ---
-        // Fetch ulang semua section kecuali news (news di-handle oleh efek newsPage)
-        if (cacheData.user) {
-          fetchProfile(cacheData.user.id);
-          fetchGlobalConfigSection();
-          fetchPersonalSection(cacheData.user.id);
-          fetchMilestonesSection();
-          fetchHelpDeskTicketsSection(cacheData.user.id);
-        }
+        // --- Hapus fetch ulang section di sini ---
+        // Jangan fetch ulang section, cukup update state dari cache
       }
       // Jika cache tidak ada, baru fetch ulang
       // else { fetchUserAndInit(); }
