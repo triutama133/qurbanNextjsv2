@@ -265,10 +265,8 @@ const fetchNewsSection = async (page = 1) => {
 useEffect(() => {
   const handleVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
-      // Cek apakah cache masih ada
       const cached = sessionStorage.getItem('dashboardCache');
       if (cached) {
-        // Jangan fetch ulang, cukup update state dari cache
         const cacheData = JSON.parse(cached);
         setUser(cacheData.user);
         setProfile(cacheData.profile);
@@ -288,6 +286,16 @@ useEffect(() => {
         setLoadingMilestones(false);
         setLoadingHelpDeskTickets(false);
         setLoadingInitial(false);
+
+        // --- Tambahan: fetch ulang data section agar tidak stuck di skeleton ---
+        // Fetch ulang semua section kecuali news (news di-handle oleh efek newsPage)
+        if (cacheData.user) {
+          fetchProfile(cacheData.user.id);
+          fetchGlobalConfigSection();
+          fetchPersonalSection(cacheData.user.id);
+          fetchMilestonesSection();
+          fetchHelpDeskTicketsSection(cacheData.user.id);
+        }
       }
       // Jika cache tidak ada, baru fetch ulang
       // else { fetchUserAndInit(); }
@@ -300,6 +308,21 @@ useEffect(() => {
   };
 }, []);
 
+// --- Tambahan: fetch ulang semua section saat cache di-load di awal (bukan hanya news) ---
+useEffect(() => {
+  const cached = sessionStorage.getItem('dashboardCache');
+  if (cached && cached !== 'null') {
+    const cacheData = JSON.parse(cached);
+    if (cacheData.user) {
+      fetchProfile(cacheData.user.id);
+      fetchGlobalConfigSection();
+      fetchPersonalSection(cacheData.user.id);
+      fetchMilestonesSection();
+      fetchHelpDeskTicketsSection(cacheData.user.id);
+    }
+  }
+}, []);
+
 
 useEffect(() => {
   // Jika user baru login, paksa refresh dashboard
@@ -308,11 +331,13 @@ useEffect(() => {
   }
 }, [user]);
 
+useEffect(() => {
+  fetchUserAndInit();
+}, []);
+
   // Fetch section data setelah user tersedia
 useEffect(() => {
-  // Cek cache dulu sebelum fetch
   const cached = sessionStorage.getItem('dashboardCache');
-  // Jika user sudah login dan cache belum ada, fetch data
   if (user && (!cached || cached === 'null')) {
     Promise.all([
       fetchProfile(user.id),
@@ -336,7 +361,10 @@ useEffect(() => {
         milestones,
       };
       sessionStorage.setItem('dashboardCache', JSON.stringify(dashboardCache));
+      setLoadingInitial(false); // <-- Tambahkan ini!
     });
+  } else if (cached) {
+    setLoadingInitial(false); // <-- Tambahkan ini juga agar cache langsung tampil
   }
 }, [user, router, searchParams]);
 
@@ -849,6 +877,18 @@ const handleSignOut = async () => {
 
   if (error) return <div className="text-center mt-10 text-red-500">Error: {error}</div>;
 
+  if (loadingInitial) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <CardSkeleton />
+      </div>
+    );
+  }
+
+  // --- Tambahkan deklarasi ini sebelum blok render ---
+  const isInitialDepositMade = profile?.IsInitialDepositMade;
+
+  // --- Tambahkan deklarasi rekomendasiTabungPerBulan ---
   // Rekomendasi Tabung Per Bulan
   const targetDateGlobal = globalConfig?.TanggalTargetQurban ? new Date(globalConfig.TanggalTargetQurban) : null;
   const today = new Date();
@@ -862,11 +902,6 @@ const handleSignOut = async () => {
         rekomendasiTabungPerBulan = remainingToTarget / remainingMonths;
     }
   }
-
-  // --- Cek Status Setoran Awal ---
-  const isInitialDepositMade = profile?.IsInitialDepositMade;
-  // const isTargetForTransferReached = personalTotalRecorded >= (globalConfig?.TargetForTransfer || 0); // Sudah dicek di handler
-  
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -1155,10 +1190,30 @@ const handleSignOut = async () => {
                                 ))
                             ) : (
                                 <p className="text-gray-500 text-sm">Belum ada berita terbaru.</p>
-                            )}
-                        </div>
-                    )}
-                </div>
+                                      )}
+                                      {/* Pagination Controls */}
+                                      <div className="flex justify-between items-center mt-4">
+                                        <button
+                                          disabled={newsPage === 1}
+                                          onClick={() => setNewsPage(newsPage - 1)}
+                                          className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+                                        >
+                                          Sebelumnya
+                                        </button>
+                                        <span className="text-sm text-gray-600">
+                                          Halaman {newsPage} dari {Math.ceil(newsTotal / NEWS_PER_PAGE)}
+                                        </span>
+                                        <button
+                                          disabled={newsPage >= Math.ceil(newsTotal / NEWS_PER_PAGE)}
+                                          onClick={() => setNewsPage(newsPage + 1)}
+                                          className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+                                        >
+                                          Berikutnya
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
               </div>
 
               {/* Kolom Kanan: Pencatatan Transaksi, Riwayat */}
