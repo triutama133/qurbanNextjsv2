@@ -47,7 +47,11 @@ export async function POST(request) {
           "StatusSetoran": "Belum Setor",
           "TargetPribadi": 2650000,
           "TanggalDaftar": new Date().toISOString(),
-          "IsInitialDepositMade": false
+          "IsInitialDepositMade": false,
+          "InitialDepositStatus": "Pending",
+          // Jika Anda ingin setiap user baru memiliki status 'Normal' secara default,
+          // biarkan ini. Jika tidak, hapus baris ini dan biarkan default DB '{}' yang berlaku.
+          "StatusPequrban": ['Normal']
         },
       ]);
 

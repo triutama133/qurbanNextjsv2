@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from 'react'; 
 import { supabase } from "@/lib/supabase"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -174,43 +174,84 @@ export default function DashboardPage() {
     }
   }
 
-  const fetchPersonalSection = async (userId) => {
-    setLoadingPersonal(true)
+ const fetchPersonalSectionData = useCallback(async (userId, currentProfile, currentGlobalConfig) => { // Tambahkan currentProfile dan currentGlobalConfig
+    setLoadingPersonal(true);
     try {
-      // Fetch Personal Saving History
       const { data: savingHistoryData, error: savingHistoryError } = await supabase
-        .from("tabungan")
-        .select("*")
-        .eq("UserId", userId)
-        .order("Tanggal", { ascending: false })
-      if (savingHistoryError) throw savingHistoryError
-      setPersonalSavingHistory(savingHistoryData)
+        .from('tabungan')
+        .select('*')
+        .eq('UserId', userId)
+        .order('Tanggal', { ascending: false });
+      if (savingHistoryError) throw savingHistoryError;
+      setPersonalSavingHistory(savingHistoryData);
+      
+      let totalRecorded = 0;
+      let totalUsed = 0;
+      savingHistoryData.forEach(item => {
+          if (item.Tipe === 'Setoran') {
+              totalRecorded += (item.Jumlah || 0);
+          } else if (item.Tipe === 'Penggunaan') {
+              totalUsed += (item.Jumlah || 0);
+          }
+      });
+      setPersonalTotalRecorded(totalRecorded);
+      setPersonalUsed(totalUsed);
 
-      let totalRecorded = 0
-      let totalUsed = 0
-      savingHistoryData.forEach((item) => {
-        if (item.Tipe === "Setoran") totalRecorded += item.Jumlah || 0
-        else if (item.Tipe === "Penggunaan") totalUsed += item.Jumlah || 0
-      })
-      setPersonalTotalRecorded(totalRecorded)
-      setPersonalUsed(totalUsed)
-
-      // Fetch Personal Transfer Confirmations
       const { data: transferData, error: transferError } = await supabase
-        .from("transfer_confirmations")
-        .select("*")
-        .eq("UserId", userId)
-        .eq("Status", "Approved")
-        .order("Timestamp", { ascending: false })
-      if (transferError) throw transferError
-      setPersonalTransferConfirmations(transferData)
-      setPersonalTransferred(transferData.reduce((sum, item) => sum + (item.Amount || 0), 0))
+          .from('transfer_confirmations')
+          .select('*')
+          .eq('UserId', userId)
+          .eq('Status', 'Approved')
+          .order('Timestamp', { ascending: false });
+      if (transferError) throw transferError;
+      
+      let totalTransferredApproved = transferData.reduce((sum, item) => sum + (item.Amount || 0), 0);
+
+      // --- PERBAIKAN: Tambahkan Setoran Awal yang Approved ke total transferred ---
+      if (currentProfile?.InitialDepositStatus === 'Approved' && currentGlobalConfig?.InitialDepositAmount) {
+          totalTransferredApproved += currentGlobalConfig.InitialDepositAmount;
+      }
+      // --- AKHIR PERBAIKAN ---
+
+      setPersonalTransferConfirmations(transferData); // Simpan riwayat konfirmasi saja
+      setPersonalTransferred(totalTransferredApproved); // Update total transferred
+
     } catch (err) {
-      setError(err.message || "Gagal memuat data pribadi.")
+      setError(err.message || "Gagal memuat data keuangan pribadi.");
+      console.error("fetchPersonalSectionData error:", err);
+      setPersonalSavingHistory([]);
+      setPersonalTransferConfirmations([]);
+      setPersonalTotalRecorded(0);
+      setPersonalUsed(0);
+      setPersonalTransferred(0);
     } finally {
-      setLoadingPersonal(false)
+      setLoadingPersonal(false);
     }
-  }
+  }, []); // Dependensi kosong (karena profile dan globalConfig akan diteruskan sebagai argumen)
+
+  
+useEffect(() => {
+    if (user && profile && globalConfig) {
+      // Set initial loading states for all sections that will be fetched here
+      setLoadingPersonal(true);
+      setLoadingNews(true);
+      setLoadingMilestones(true);
+      setLoadingHelpDeskTickets(true);
+      setLoadingDocuments(true);
+
+      Promise.allSettled([
+        fetchPersonalSectionData(user.id, profile, globalConfig), // PERBAIKAN: Teruskan profile dan globalConfig
+        fetchNewsSection(newsPage),
+        fetchMilestonesSection(),
+        fetchHelpDeskTicketsSection(user.id),
+        fetchResourcesSection(user.id)
+      ]).then(results => {
+          // Anda bisa memeriksa results di sini untuk logging atau penanganan error yang lebih spesifik per section
+          // console.log("Section fetch results:", results);
+      });
+    }
+  }, [user, profile, globalConfig]);
+
 
   const [newsPage, setNewsPage] = useState(1)
   const [newsTotal, setNewsTotal] = useState(0)
@@ -300,6 +341,31 @@ export default function DashboardPage() {
     }
   }
 
+    const fetchResourcesSection = useCallback(async (userId) => { // Fungsi baru untuk fetch resources
+    setLoadingDocuments(true);
+    try {
+        const { data: resourcesData, error: resourcesError } = await supabase
+            .from('app_resources')
+            .select('*')
+            .or(`IsGlobal.eq.true,UserId.eq.${userId}`) // Global OR specific to user
+            .order('CreatedAt', { ascending: false });
+        
+        if (resourcesData === null) { 
+            setDocuments([]);
+        } else if (resourcesError) {
+            throw resourcesError;
+        } else {
+            setDocuments(resourcesData);
+        }
+    } catch (err) {
+        setError(err.message || "Gagal memuat dokumen dan sumber daya.");
+        console.error("fetchResourcesSection error:", err);
+        setDocuments([]);
+    } finally {
+        setLoadingDocuments(false);
+    }
+  }, []);
+
   // Initial effect: hanya cek user, lalu fetch section data
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -348,7 +414,7 @@ export default function DashboardPage() {
       if (cacheData.user) {
         fetchProfile(cacheData.user.id)
         fetchGlobalConfigSection()
-        fetchPersonalSection(cacheData.user.id)
+        fetchPersonalSectionData(cacheData.user.id)
         fetchMilestonesSection()
         fetchHelpDeskTicketsSection(cacheData.user.id)
       }
@@ -373,7 +439,7 @@ export default function DashboardPage() {
       Promise.all([
         fetchProfile(user.id),
         fetchGlobalConfigSection(),
-        fetchPersonalSection(user.id),
+        fetchPersonalSectionData(user.id),
         fetchNewsSection(),
         fetchMilestonesSection(),
         fetchHelpDeskTicketsSection(user.id),
@@ -391,6 +457,7 @@ export default function DashboardPage() {
           userHelpDeskTickets,
           news,
           milestones,
+          documents
         }
         sessionStorage.setItem("dashboardCache", JSON.stringify(dashboardCache))
         setLoadingInitial(false) // <-- Tambahkan ini!
@@ -414,6 +481,7 @@ export default function DashboardPage() {
         userHelpDeskTickets,
         news,
         milestones,
+        documents
       }
       sessionStorage.setItem("dashboardCache", JSON.stringify(dashboardCache))
     }
@@ -429,6 +497,7 @@ export default function DashboardPage() {
     userHelpDeskTickets,
     news,
     milestones,
+    documents
   ])
   // --- Akhir kode tambahan ---
 
@@ -943,16 +1012,17 @@ export default function DashboardPage() {
 
   // Fungsi refresh dashboard (fetch semua section)
   // Perbaiki dengan menggunakan fungsi fetch section yang sudah ada
-  const handleRefreshDashboard = () => {
+const handleRefreshDashboard = () => { // Fungsi untuk tombol refresh
     if (user) {
-      fetchProfile(user.id)
-      fetchGlobalConfigSection()
-      fetchPersonalSection(user.id)
-      fetchNewsSection()
-      fetchMilestonesSection()
-      fetchHelpDeskTicketsSection(user.id)
+        // Panggil kembali fungsi fetch untuk setiap section
+        fetchGlobalConfigSection();
+        fetchPersonalSectionData(user.id, profile, globalConfig); // PERBAIKAN: Teruskan profile dan globalConfig
+        fetchNewsSection(newsPage); // Panggil dengan halaman dan limit saat ini
+        fetchMilestonesSection();
+        fetchHelpDeskTicketsSection(user.id);
+        fetchResourcesSection(user.id); // Refresh dokumen juga
     }
-  }
+};  
 
   // --- Render Logic ---
   // Initial loading overlay for the entire page
@@ -1168,12 +1238,25 @@ export default function DashboardPage() {
                         <p>
                           <strong>Nama Pequrban:</strong> {profile.NamaPequrban || profile.Nama}
                         </p>
-                        <p>
-                          <strong>Status Pequrban:</strong>{" "}
-                          <span className="font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800">
-                            {profile.StatusPequrban || "Normal"}
-                          </span>
-                        </p>
+                          <p>
+                            <strong>Status Pequrban:</strong>{" "}
+                            {/* PERBAIKAN: Iterasi StatusPequrban jika berupa array untuk menampilkan badge terpisah */}
+                            {profile.StatusPequrban && Array.isArray(profile.StatusPequrban) && profile.StatusPequrban.length > 0 ? (
+                              profile.StatusPequrban.map((statusItem, index) => (
+                                <span
+                                  key={index} // Key yang aman karena ini hanya display list item
+                                  className="font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800 mr-1 mb-1 inline-block" // Tambahkan margin dan inline-block untuk tampilan badge
+                                >
+                                  {statusItem}
+                                </span>
+                              ))
+                            ) : (
+                              // Fallback jika tidak ada status atau bukan array
+                              <span className="font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                                Normal
+                              </span>
+                            )}
+                          </p>
                         {profile.Benefits && profile.Benefits.length > 0 ? (
                           <div>
                             <strong>Benefit Anda:</strong>
