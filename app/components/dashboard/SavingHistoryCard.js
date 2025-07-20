@@ -1,24 +1,23 @@
 // File: app/components/dashboard/SavingHistoryCard.js
-"use client";
-import React from 'react';
-import { ListSkeleton } from '@/components/common/Skeletons';
+"use client"
+import { ListSkeleton } from "@/components/common/Skeletons"
 
 // ✅ PERBAIKAN: Menambahkan nilai default `[]` dan pengecekan internal `|| []`
-export default function SavingHistoryCard({ 
-  loading, 
-  savingHistory = [], 
-  transferConfirmations = [], 
-  isMenabungSendiri, 
-  onDelete, 
-  formatRupiah 
+export default function SavingHistoryCard({
+  loading,
+  savingHistory = [],
+  transferConfirmations = [],
+  isMenabungSendiri,
+  onDelete,
+  formatRupiah,
 }) {
   if (loading) {
-    return <ListSkeleton />;
+    return <ListSkeleton />
   }
 
   // Lapisan keamanan tambahan untuk memastikan variabel adalah array
-  const historyToRender = savingHistory || [];
-  const confirmationsToRender = transferConfirmations || [];
+  const historyToRender = Array.isArray(savingHistory) ? savingHistory : []
+  const confirmationsToRender = Array.isArray(transferConfirmations) ? transferConfirmations : []
 
   return (
     <>
@@ -27,17 +26,32 @@ export default function SavingHistoryCard({
         <div className="max-h-96 overflow-y-auto pr-2">
           {historyToRender.length > 0 ? (
             historyToRender.map((item) => (
-              <div key={item.TransaksiId} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
+              <div
+                key={item.TransaksiId}
+                className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0"
+              >
                 <div>
                   <p className="font-medium text-sm">
-                    {item.Tipe === 'Penggunaan' ? '-' : ''}{formatRupiah(item.Jumlah)}
-                    <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${item.Tipe === 'Setoran' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {item.Tipe === "Penggunaan" ? "-" : ""}
+                    {formatRupiah ? formatRupiah(item.Jumlah) : `Rp ${item.Jumlah?.toLocaleString("id-ID") || 0}`}
+                    <span
+                      className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${item.Tipe === "Setoran" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+                    >
                       {item.Tipe}
                     </span>
                   </p>
-                  <p className="text-xs text-gray-500">{new Date(item.Tanggal).toLocaleDateString('id-ID')} - {item.Metode || 'Tidak Ada Metode'}</p>
+                  <p className="text-xs text-gray-500">
+                    {new Date(item.Tanggal).toLocaleDateString("id-ID")} - {item.Metode || "Tidak Ada Metode"}
+                  </p>
                 </div>
-                <button onClick={() => onDelete(item.TransaksiId)} className="text-red-500 hover:text-red-700 text-xs">Hapus</button>
+                {onDelete && (
+                  <button
+                    onClick={() => onDelete(item.TransaksiId)}
+                    className="text-red-500 hover:text-red-700 text-xs"
+                  >
+                    Hapus
+                  </button>
+                )}
               </div>
             ))
           ) : (
@@ -52,11 +66,27 @@ export default function SavingHistoryCard({
           <div className="max-h-96 overflow-y-auto pr-2">
             {confirmationsToRender.length > 0 ? (
               confirmationsToRender.map((item) => (
-                <div key={item.ConfirmationId} className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
+                <div
+                  key={item.ConfirmationId}
+                  className="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0"
+                >
                   <div>
-                    <p className="font-medium text-sm">{formatRupiah(item.Amount)}</p>
-                    <p className="text-xs text-gray-500">{new Date(item.Timestamp).toLocaleDateString('id-ID')} - Status: {item.Status}</p>
-                    {item.ProofLink && <a href={item.ProofLink} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline">Lihat Bukti</a>}
+                    <p className="font-medium text-sm">
+                      {formatRupiah ? formatRupiah(item.Amount) : `Rp ${item.Amount?.toLocaleString("id-ID") || 0}`}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(item.Timestamp).toLocaleDateString("id-ID")} - Status: {item.Status}
+                    </p>
+                    {item.ProofLink && (
+                      <a
+                        href={item.ProofLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-500 hover:underline"
+                      >
+                        Lihat Bukti
+                      </a>
+                    )}
                   </div>
                 </div>
               ))
@@ -67,5 +97,5 @@ export default function SavingHistoryCard({
         </div>
       )}
     </>
-  );
+  )
 }
