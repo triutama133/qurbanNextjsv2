@@ -230,27 +230,85 @@ export default function DashboardPage() {
   }, []); // Dependensi kosong (karena profile dan globalConfig akan diteruskan sebagai argumen)
 
   
-useEffect(() => {
-    if (user && profile && globalConfig) {
-      // Set initial loading states for all sections that will be fetched here
+  // --- Tambahan: State penanda sudah fetch section agar tidak fetch ulang ---
+  const [hasFetchedSections, setHasFetchedSections] = useState(false);
+
+  useEffect(() => {
+    // Restore dari cache jika ada (hanya saat mount pertama)
+    const cached = sessionStorage.getItem("dashboardCache");
+    if (cached && cached !== "null") {
+      const cacheData = JSON.parse(cached);
+      if (cacheData.user) setUser(cacheData.user);
+      if (cacheData.profile) setProfile(cacheData.profile);
+      if (cacheData.globalConfig) setGlobalConfig(cacheData.globalConfig);
+      if (cacheData.personalTotalRecorded) setPersonalTotalRecorded(cacheData.personalTotalRecorded);
+      if (cacheData.personalUsed) setPersonalUsed(cacheData.personalUsed);
+      if (cacheData.personalTransferred) setPersonalTransferred(cacheData.personalTransferred);
+      if (cacheData.personalSavingHistory) setPersonalSavingHistory(cacheData.personalSavingHistory);
+      if (cacheData.personalTransferConfirmations) setPersonalTransferConfirmations(cacheData.personalTransferConfirmations);
+      if (cacheData.userHelpDeskTickets) setUserHelpDeskTickets(cacheData.userHelpDeskTickets);
+      if (cacheData.news) setNews(cacheData.news);
+      if (cacheData.milestones) setMilestones(cacheData.milestones);
+      if (cacheData.documents) setDocuments(cacheData.documents);
+      setLoadingInitial(false);
+      setHasFetchedSections(true);
+    }
+  }, []);
+
+  // Fetch profile & globalConfig setelah user tersedia, hanya jika belum ada
+  useEffect(() => {
+    if (user && !profile && !globalConfig) {
+      setLoadingProfile(true);
+      setLoadingGlobalConfig(true);
+      Promise.all([
+        fetchProfile(user.id),
+        fetchGlobalConfigSection()
+      ]).then(() => {
+        setLoadingProfile(false);
+        setLoadingGlobalConfig(false);
+      });
+    }
+  }, [user]);
+
+  // Fetch semua section setelah profile & globalConfig siap, hanya sekali
+  useEffect(() => {
+    if (user && profile && globalConfig && !hasFetchedSections) {
       setLoadingPersonal(true);
       setLoadingNews(true);
       setLoadingMilestones(true);
       setLoadingHelpDeskTickets(true);
       setLoadingDocuments(true);
-
+      setHasFetchedSections(true);
       Promise.allSettled([
-        fetchPersonalSectionData(user.id, profile, globalConfig), // PERBAIKAN: Teruskan profile dan globalConfig
+        fetchPersonalSectionData(user.id, profile, globalConfig),
         fetchNewsSection(newsPage),
         fetchMilestonesSection(),
         fetchHelpDeskTicketsSection(user.id),
         fetchResourcesSection(user.id)
-      ]).then(results => {
-          // Anda bisa memeriksa results di sini untuk logging atau penanganan error yang lebih spesifik per section
-          // console.log("Section fetch results:", results);
+      ]).then(() => {
+        setLoadingInitial(false);
       });
     }
-  }, [user, profile, globalConfig]);
+  }, [user, profile, globalConfig, hasFetchedSections]);
+
+  // Reset penanda fetch section saat logout atau refresh dashboard
+  const handleRefreshDashboard = () => {
+    setHasFetchedSections(false);
+    setProfile(null);
+    setGlobalConfig(null);
+    setPersonalTotalRecorded(0);
+    setPersonalUsed(0);
+    setPersonalTransferred(0);
+    setPersonalSavingHistory([]);
+    setPersonalTransferConfirmations([]);
+    setUserHelpDeskTickets([]);
+    setNews([]);
+    setMilestones(null);
+    setDocuments([]);
+    setLoadingInitial(true);
+    sessionStorage.removeItem("dashboardCache");
+    fetchUserAndInit(); // fetch ulang user agar siklus data berjalan normal
+  };
 
 
   const [newsPage, setNewsPage] = useState(1)
@@ -366,45 +424,8 @@ useEffect(() => {
     }
   }, []);
 
-  // Initial effect: hanya cek user, lalu fetch section data
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        const cached = sessionStorage.getItem("dashboardCache")
-        if (cached) {
-          const cacheData = JSON.parse(cached)
-          setUser(cacheData.user)
-          setProfile(cacheData.profile)
-          setGlobalConfig(cacheData.globalConfig)
-          setPersonalTotalRecorded(cacheData.personalTotalRecorded)
-          setPersonalUsed(cacheData.personalUsed)
-          setPersonalTransferred(cacheData.personalTransferred)
-          setPersonalSavingHistory(cacheData.personalSavingHistory)
-          setPersonalTransferConfirmations(cacheData.personalTransferConfirmations)
-          setUserHelpDeskTickets(cacheData.userHelpDeskTickets)
-          setNews(cacheData.news)
-          setMilestones(cacheData.milestones)
-          setLoadingProfile(false)
-          setLoadingGlobalConfig(false)
-          setLoadingPersonal(false)
-          setLoadingNews(false)
-          setLoadingMilestones(false)
-          setLoadingHelpDeskTickets(false)
-          setLoadingInitial(false)
+ 
 
-          // --- Hapus fetch ulang section di sini ---
-          // Jangan fetch ulang section, cukup update state dari cache
-        }
-        // Jika cache tidak ada, baru fetch ulang
-        // else { fetchUserAndInit(); }
-      }
-    }
-
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
-    }
-  }, [])
 
   // --- Tambahan: fetch ulang semua section saat cache di-load di awal (bukan hanya news) ---
   useEffect(() => {
@@ -1012,17 +1033,6 @@ useEffect(() => {
 
   // Fungsi refresh dashboard (fetch semua section)
   // Perbaiki dengan menggunakan fungsi fetch section yang sudah ada
-const handleRefreshDashboard = () => { // Fungsi untuk tombol refresh
-    if (user) {
-        // Panggil kembali fungsi fetch untuk setiap section
-        fetchGlobalConfigSection();
-        fetchPersonalSectionData(user.id, profile, globalConfig); // PERBAIKAN: Teruskan profile dan globalConfig
-        fetchNewsSection(newsPage); // Panggil dengan halaman dan limit saat ini
-        fetchMilestonesSection();
-        fetchHelpDeskTicketsSection(user.id);
-        fetchResourcesSection(user.id); // Refresh dokumen juga
-    }
-};  
 
   // --- Render Logic ---
   // Initial loading overlay for the entire page
@@ -1258,14 +1268,17 @@ const handleRefreshDashboard = () => { // Fungsi untuk tombol refresh
                             )}
                           </p>
                         {profile.Benefits && profile.Benefits.length > 0 ? (
-                          <div>
-                            <strong>Benefit Anda:</strong>
-                            <ul className="list-disc list-inside ml-4 mt-1">
-                              {profile.Benefits.map((benefit, index) => (
-                                <li key={index}>{benefit}</li>
-                              ))}
-                            </ul>
-                          </div>
+                          <p>
+                            <strong>Benefit Anda:</strong>{" "}
+                            {profile.Benefits.map((benefit, index) => (
+                              <span
+                                key={index}
+                                className="font-semibold px-2 py-1 rounded-full bg-green-100 text-green-800 mr-1 mb-1 inline-block align-middle"
+                              >
+                                {benefit}
+                              </span>
+                            ))}
+                          </p>
                         ) : (
                           <p className="text-gray-500">Belum ada benefit yang ditetapkan.</p>
                         )}

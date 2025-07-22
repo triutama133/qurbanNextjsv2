@@ -10,6 +10,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); // 'success' or 'error'
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMsg, setForgotMsg] = useState('');
   const router = useRouter();
 
   const handleSignIn = async (e) => {
@@ -67,6 +71,21 @@ export default function LoginPage() {
       }
     }
     setLoading(false);
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setForgotMsg('');
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/reset-password`
+    });
+    if (error) {
+      setForgotMsg(`Gagal mengirim email reset: ${error.message}`);
+    } else {
+      setForgotMsg('Email reset password telah dikirim. Silakan cek inbox/spam Anda.');
+    }
+    setForgotLoading(false);
   };
 
   return (
@@ -140,6 +159,59 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
+
+        {/* Link Lupa Password */}
+        <p className="mt-2 text-center text-sm text-gray-600">
+          <button
+            type="button"
+            className="font-medium text-indigo-600 hover:text-indigo-500 focus:outline-none"
+            onClick={() => setShowForgot(true)}
+          >
+            Lupa password?
+          </button>
+        </p>
+
+        {/* Modal Lupa Password */}
+        {showForgot && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm relative">
+              <button
+                className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
+                onClick={() => {
+                  setShowForgot(false);
+                  setForgotMsg('');
+                  setForgotEmail('');
+                }}
+                aria-label="Tutup"
+              >
+                &times;
+              </button>
+              <h3 className="text-lg font-semibold mb-2">Reset Password</h3>
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <input
+                  type="email"
+                  required
+                  className="w-full border px-3 py-2 rounded"
+                  placeholder="Masukkan email Anda"
+                  value={forgotEmail}
+                  onChange={e => setForgotEmail(e.target.value)}
+                />
+                {forgotMsg && (
+                  <div className={`text-sm ${forgotMsg.startsWith('Email reset') ? 'text-green-600' : 'text-red-600'}`}>
+                    {forgotMsg}
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700"
+                >
+                  {forgotLoading ? 'Mengirim...' : 'Kirim Link Reset'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* BAGIAN YANG PERLU ANDA PASTIKAN ADA: */}
         <p className="mt-4 text-center text-sm text-gray-600">
