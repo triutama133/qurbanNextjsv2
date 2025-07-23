@@ -19,7 +19,7 @@ export default function ResetPasswordPage() {
     // Jika tidak, tampilkan pesan error
     supabase.auth.getUser().then(({ data, error }) => {
       if (error || !data?.user) {
-        setMsg("Token reset tidak valid atau sudah kadaluarsa.");
+        setMsg("Token reset tidak valid, sudah kadaluarsa, atau link sudah pernah dipakai. Silakan lakukan permintaan reset password ulang.");
         setMsgType("error");
       }
     });
@@ -47,7 +47,11 @@ export default function ResetPasswordPage() {
     } else {
       setMsg("Password berhasil direset! Anda akan diarahkan ke halaman login...");
       setMsgType("success");
-      setTimeout(() => router.push("/login"), 2000);
+      // Cek apakah reset password untuk admin (role=admin di query param)
+      const isAdmin = searchParams.get("role") === "admin";
+      setTimeout(() => {
+        router.push(isAdmin ? "/admin-login" : "/login");
+      }, 2000);
     }
     setLoading(false);
   };

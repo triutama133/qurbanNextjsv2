@@ -10,7 +10,37 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState('');
+  const [forgotMessageType, setForgotMessageType] = useState('');
   const router = useRouter();
+  // Handler lupa password admin
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setForgotLoading(true);
+    setForgotMessage('');
+    setForgotMessageType('');
+    if (!forgotEmail) {
+      setForgotMessage('Email wajib diisi.');
+      setForgotMessageType('error');
+      setForgotLoading(false);
+      return;
+    }
+    // Kirim permintaan reset password via Supabase
+    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      setForgotMessage('Gagal mengirim email reset password: ' + error.message);
+      setForgotMessageType('error');
+    } else {
+      setForgotMessage('Link reset password telah dikirim ke email admin (jika terdaftar).');
+      setForgotMessageType('success');
+    }
+    setForgotLoading(false);
+  };
 
   const handleAdminSignIn = async (e) => {
     e.preventDefault();
@@ -63,9 +93,11 @@ export default function AdminLoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg border-t-8 border-indigo-600">
+        <div className="flex flex-col items-center gap-2">
+          <img src="/file.svg" alt="Sapi" className="w-16 h-16 mb-2" />
+          <h1 className="text-xl font-bold text-indigo-700 text-center">Tabungan Qurban Keluarga Peduli 1446H</h1>
+          <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">
             Login Admin
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
@@ -118,13 +150,21 @@ export default function AdminLoginPage() {
             </div>
           )}
 
-          <div>
+          <div className="flex flex-col gap-2">
             <button
               type="submit"
               disabled={loading}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               {loading ? 'Memproses...' : 'Login Admin'}
+            </button>
+            <button
+              type="button"
+              className="w-full text-xs text-indigo-600 hover:underline mt-1"
+              onClick={() => setShowForgot(true)}
+              tabIndex={-1}
+            >
+              Lupa password admin?
             </button>
           </div>
         </form>
@@ -134,6 +174,50 @@ export default function AdminLoginPage() {
             Bukan admin? Login sebagai user
           </a>
         </p>
+
+        {/* Modal lupa password admin */}
+        {showForgot && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-sm relative">
+              <button
+                className="absolute top-2 right-2 text-gray-400 hover:text-gray-700"
+                onClick={() => {
+                  setShowForgot(false);
+                  setForgotEmail('');
+                  setForgotMessage('');
+                  setForgotMessageType('');
+                }}
+                aria-label="Tutup"
+              >
+                ×
+              </button>
+              <h3 className="text-lg font-semibold mb-2 text-center">Reset Password Admin</h3>
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <input
+                  type="email"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Masukkan email admin"
+                  value={forgotEmail}
+                  onChange={e => setForgotEmail(e.target.value)}
+                  required
+                  autoFocus
+                />
+                {forgotMessage && (
+                  <div className={`py-2 px-3 rounded-md text-xs ${forgotMessageType === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                    {forgotMessage}
+                  </div>
+                )}
+                <button
+                  type="submit"
+                  disabled={forgotLoading}
+                  className="w-full py-2 px-4 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 text-sm font-medium"
+                >
+                  {forgotLoading ? 'Mengirim...' : 'Kirim Link Reset Password'}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
