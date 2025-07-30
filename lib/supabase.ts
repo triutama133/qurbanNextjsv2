@@ -10,4 +10,5 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Buat dan ekspor instance Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export default supabase;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from 'react';
-import { supabase } from '@/lib/supabase'; // Sesuaikan path jika perlu
+import supabase from '@/lib/supabase'; // Sesuaikan path jika perlu
 import { useRouter } from 'next/navigation';
 
 export default function RootPage() {

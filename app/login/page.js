@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase'; // Pastikan alias ini benar, atau gunakan path relatif
+import supabase from '@/lib/supabase'; // Pastikan alias ini benar, atau gunakan path relatif
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {

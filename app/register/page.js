@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase'; // Pastikan alias ini benar
+import supabase from '@/lib/supabase'; // Pastikan alias ini benar
 import { useRouter } from 'next/navigation';
 
 export default function RegisterPage() {
