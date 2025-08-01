@@ -1,5 +1,10 @@
+import next from 'eslint-plugin-next';
+
 export default [
   {
-    extends: ["next", "next/core-web-vitals"],
+    plugins: { next },
+    rules: {
+      ...next.configs['core-web-vitals'].rules,
+    },
   },
 ];
