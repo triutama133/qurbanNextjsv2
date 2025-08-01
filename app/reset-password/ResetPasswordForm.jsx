@@ -1,91 +1,95 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import supabase from "@/lib/supabase";
 
 export default function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
+  const token = searchParams.get("token");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [msgType, setMsgType] = useState(""); // 'success' | 'error'
+  const [message, setMessage] = useState("");
+  const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data, error }) => {
-      if (error || !data?.user) {
-        setMsg("Token reset tidak valid, sudah kadaluarsa, atau link sudah pernah dipakai. Silakan lakukan permintaan reset password ulang.");
-        setMsgType("error");
-      }
-    });
-  }, []);
+  if (!token) {
+    return (
+      <div className="max-w-md w-full bg-white p-8 rounded-xl shadow">
+        <h2 className="text-2xl font-bold mb-4 text-center">Reset Password</h2>
+        <p className="text-center text-red-600">Token reset password tidak ditemukan atau link tidak valid.</p>
+      </div>
+    );
+  }
 
-  const handleReset = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setMsg("");
-    setMsgType("");
-    if (!password || password.length < 6) {
-      setMsg("Password minimal 6 karakter.");
-      setMsgType("error");
+    setMessage("");
+    if (newPassword.length < 6) {
+      setMessage("Password minimal 6 karakter.");
       return;
     }
-    if (password !== confirm) {
-      setMsg("Konfirmasi password tidak cocok.");
-      setMsgType("error");
+    if (newPassword !== confirmPassword) {
+      setMessage("Konfirmasi password tidak cocok.");
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    if (error) {
-      setMsg("Gagal reset password: " + error.message);
-      setMsgType("error");
-    } else {
-      setMsg("Password berhasil direset! Anda akan diarahkan ke halaman login...");
-      setMsgType("success");
-      const isAdmin = searchParams.get("role") === "admin";
-      setTimeout(() => {
-        router.push(isAdmin ? "/admin-login" : "/login");
-      }, 2000);
+    try {
+      const res = await fetch("/api/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password: newPassword })
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Gagal reset password");
+      setSuccess(true);
+      setMessage("Password berhasil direset! Silakan login dengan password baru.");
+      setTimeout(() => router.push("/login"), 2000);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
     <div className="max-w-md w-full bg-white p-8 rounded-xl shadow">
       <h2 className="text-2xl font-bold mb-4 text-center">Reset Password</h2>
-      <form className="space-y-4" onSubmit={handleReset}>
-        <input
-          type="password"
-          className="w-full border px-3 py-2 rounded"
-          placeholder="Password baru"
-          value={password}
-          onChange={e => setPassword(e.target.value)}
-          minLength={6}
-          required
-        />
-        <input
-          type="password"
-          className="w-full border px-3 py-2 rounded"
-          placeholder="Konfirmasi password baru"
-          value={confirm}
-          onChange={e => setConfirm(e.target.value)}
-          minLength={6}
-          required
-        />
-        {msg && (
-          <div className={`text-sm ${msgType === "success" ? "text-green-600" : "text-red-600"}`}>
-            {msg}
+      {success ? (
+        <p className="text-center text-green-600">{message}</p>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">Password Baru</label>
+            <input
+              type="password"
+              id="newPassword"
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              required
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+            />
           </div>
-        )}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-indigo-600 text-white py-2 rounded hover:bg-indigo-700"
-        >
-          {loading ? "Memproses..." : "Reset Password"}
-        </button>
-      </form>
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">Konfirmasi Password Baru</label>
+            <input
+              type="password"
+              id="confirmPassword"
+              value={confirmPassword}
+              onChange={e => setConfirmPassword(e.target.value)}
+              required
+              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 font-medium"
+          >
+            {loading ? "Memproses..." : "Reset Password"}
+          </button>
+          {message && <p className="text-center text-red-600">{message}</p>}
+        </form>
+      )}
     </div>
   );
 }

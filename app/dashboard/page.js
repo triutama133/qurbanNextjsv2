@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import supabase from "@/lib/supabase"
+// import supabase from "@/lib/supabase" // Not needed anymore
 import { formatRupiah, getMonthDifference } from "@/lib/utils"
 
 // Import custom hooks
@@ -72,6 +72,9 @@ function DashboardContent() {
     fetchMilestonesSection,
     fetchHelpDeskTicketsSection,
     fetchResourcesSection,
+    setNews,
+    setMilestones,
+    setDocuments,
   } = dashboardData
 
   const dashboardActions = useDashboardActions({
@@ -100,6 +103,9 @@ function DashboardContent() {
     handleConfirmTransfer,
     handleHelpDeskSubmit,
     showConfirmModal,
+    handleEditTransaction,
+    handleDeleteSaving,
+    handleDeleteTransferConfirmation,
   } = dashboardActions
 
   // --- Effects ---
@@ -131,13 +137,22 @@ function DashboardContent() {
       if (cache) {
         try {
           const parsed = JSON.parse(cache)
-          if (parsed && parsed.news && parsed.milestones && parsed.documents && parsed.personalSavingHistory && parsed.personalTransferConfirmations && parsed.userHelpDeskTickets) {
+          if (
+            parsed &&
+            parsed.news &&
+            parsed.milestones &&
+            parsed.documents &&
+            parsed.personalSavingHistory &&
+            parsed.personalTransferConfirmations &&
+            parsed.userHelpDeskTickets
+          ) {
             // Set state dari cache (hanya jika belum ada data)
             if (!news.length) setNews(parsed.news)
             if (!milestones.length) setMilestones(parsed.milestones)
             if (!documents.length) setDocuments(parsed.documents)
             if (!personalSavingHistory.length) setPersonalSavingHistory(parsed.personalSavingHistory)
-            if (!personalTransferConfirmations.length) setPersonalTransferConfirmations(parsed.personalTransferConfirmations)
+            if (!personalTransferConfirmations.length)
+              setPersonalTransferConfirmations(parsed.personalTransferConfirmations)
             if (!userHelpDeskTickets.length) setUserHelpDeskTickets(parsed.userHelpDeskTickets)
             setLoadingInitial(false)
             return
@@ -168,29 +183,25 @@ function DashboardContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, profile, appConfig, newsPage])
 
+
+  // Cek session custom: jika user tidak ada di localStorage, redirect ke login
   useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) {
+    if (typeof window !== "undefined") {
+      const userStr = localStorage.getItem("qurban_user")
+      if (!userStr) {
         router.push("/login")
-      } else {
-        setUser(session.user)
       }
-    })
-    return () => {
-      authListener.subscription.unsubscribe()
     }
-  }, [router, setUser])
+  }, [router])
 
   // --- Event Handlers ---
   const handleSignOut = async () => {
     setLoadingInitial(true)
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      console.error("Error signing out:", error.message)
-      setError("Gagal logout: " + error.message)
-    } else {
-      router.push("/login")
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("qurban_user")
+      sessionStorage.clear()
     }
+    router.push("/login")
     setLoadingInitial(false)
   }
 
@@ -268,65 +279,96 @@ function DashboardContent() {
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Kolom Kiri (2/3 lebar di layar besar) */}
-              <div className="lg:col-span-2 space-y-6">
-                <ProfilePequrban profile={profile} loadingProfile={loadingProfile} />
-
-                <PersonalProgress
-                  profile={profile}
-                  appConfig={appConfig}
-                  personalTotalRecorded={personalTotalRecorded}
-                  personalUsed={personalUsed}
-                  personalTransferred={personalTransferred}
-                  loadingPersonal={loadingPersonal}
-                  formatRupiah={formatRupiah}
-                  getMonthDifference={getMonthDifference}
-                />
-
-                <MilestoneProgram milestones={milestones} loadingMilestones={loadingMilestones} />
-
-                <NewsSection
-                  news={news}
-                  loadingNews={loadingNews}
-                  newsPage={newsPage}
-                  setNewsPage={setNewsPage}
-                  totalNewsPages={totalNewsPages}
-                />
-
-                <DocumentsResources documents={documents} loadingDocuments={loadingDocuments} />
-              </div>
-
-              {/* Kolom Kanan */}
-              <div className="lg:col-span-1 space-y-6">
-                <TransactionForms
-                  profile={profile}
-                  appConfig={appConfig}
-                  user={user}
-                  personalTotalRecorded={personalTotalRecorded}
-                  personalUsed={personalUsed}
-                  addSavingLoading={addSavingLoading}
-                  useSavingLoading={useSavingLoading}
-                  confirmTransferLoading={confirmTransferLoading}
-                  handleAddSaving={handleAddSaving}
-                  handleUseSaving={handleUseSaving}
-                  handleInitialDeposit={handleInitialDeposit}
-                  handleConfirmTransfer={handleConfirmTransfer}
-                  formatRupiah={formatRupiah}
-                />
-
-                <SavingHistory
-                  personalSavingHistory={personalSavingHistory}
-                  loadingPersonal={loadingPersonal}
-                  formatRupiah={formatRupiah}
-                  showConfirmModal={showConfirmModal}
-                />
-
-                <TransferHistory
-                  profile={profile}
-                  personalTransferConfirmations={personalTransferConfirmations}
-                  loadingPersonal={loadingPersonal}
-                  formatRupiah={formatRupiah}
-                />
-              </div>
+              {/* Jika setoran awal belum approved, hanya tampilkan profil dan card setoran awal */}
+              {profile && profile.IsInitialDepositMade && profile.InitialDepositStatus === "Approved" ? (
+                <>
+                  <div className="lg:col-span-2 space-y-6">
+                    <ProfilePequrban profile={profile} loadingProfile={loadingProfile} />
+                    <PersonalProgress
+                      profile={profile}
+                      globalConfig={appConfig}
+                      personalTotalRecorded={personalTotalRecorded}
+                      personalUsed={personalUsed}
+                      personalTransferred={personalTransferred}
+                      loadingPersonal={loadingPersonal}
+                      formatRupiah={formatRupiah}
+                      getMonthDifference={getMonthDifference}
+                    />
+                    <MilestoneProgram milestones={milestones} loadingMilestones={loadingMilestones} />
+                    <NewsSection
+                      news={news}
+                      loadingNews={loadingNews}
+                      newsPage={newsPage}
+                      setNewsPage={setNewsPage}
+                      totalNewsPages={totalNewsPages}
+                    />
+                    <DocumentsResources documents={documents} loadingDocuments={loadingDocuments} />
+                  </div>
+                  {/* Kolom Kanan */}
+                  <div className="lg:col-span-1 space-y-6">
+                    <TransactionForms
+                      profile={profile}
+                      appConfig={appConfig}
+                      user={user}
+                      personalTotalRecorded={personalTotalRecorded}
+                      personalUsed={personalUsed}
+                      personalSavingHistory={personalSavingHistory}
+                      personalTransferConfirmations={personalTransferConfirmations}
+                      addSavingLoading={addSavingLoading}
+                      useSavingLoading={useSavingLoading}
+                      confirmTransferLoading={confirmTransferLoading}
+                      handleAddSaving={handleAddSaving}
+                      handleUseSaving={handleUseSaving}
+                      handleInitialDeposit={handleInitialDeposit}
+                      handleConfirmTransfer={handleConfirmTransfer}
+                      handleDeleteSaving={handleDeleteSaving}
+                      handleDeleteTransferConfirmation={handleDeleteTransferConfirmation}
+                      formatRupiah={formatRupiah}
+                    />
+                    <SavingHistory
+                      personalSavingHistory={personalSavingHistory}
+                      loadingPersonal={loadingPersonal}
+                      formatRupiah={formatRupiah}
+                      showConfirmModal={showConfirmModal}
+                      handleEditTransaction={handleEditTransaction}
+                      handleDeleteTransaction={handleDeleteSaving}
+                    />
+                    <TransferHistory
+                      profile={profile}
+                      personalTransferConfirmations={personalTransferConfirmations}
+                      loadingPersonal={loadingPersonal}
+                      formatRupiah={formatRupiah}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="lg:col-span-3">
+                    <ProfilePequrban profile={profile} loadingProfile={loadingProfile} />
+                  </div>
+                  <div className="lg:col-span-3">
+                    <TransactionForms
+                      profile={profile}
+                      appConfig={appConfig}
+                      user={user}
+                      personalTotalRecorded={personalTotalRecorded}
+                      personalUsed={personalUsed}
+                      personalSavingHistory={personalSavingHistory}
+                      personalTransferConfirmations={personalTransferConfirmations}
+                      addSavingLoading={addSavingLoading}
+                      useSavingLoading={useSavingLoading}
+                      confirmTransferLoading={confirmTransferLoading}
+                      handleAddSaving={handleAddSaving}
+                      handleUseSaving={handleUseSaving}
+                      handleInitialDeposit={handleInitialDeposit}
+                      handleConfirmTransfer={handleConfirmTransfer}
+                      handleDeleteSaving={handleDeleteSaving}
+                      handleDeleteTransferConfirmation={handleDeleteTransferConfirmation}
+                      formatRupiah={formatRupiah}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>

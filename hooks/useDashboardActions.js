@@ -24,6 +24,21 @@ export function useDashboardActions({
   const [confirmTransferLoading, setConfirmTransferLoading] = useState(false)
   const [helpDeskFormLoading, setHelpDeskFormLoading] = useState(false)
 
+  // Ambil user dari localStorage jika tidak ada di props
+  const getUserId = () => {
+    if (user && user.id) return user.id;
+    if (typeof window !== 'undefined') {
+      const userStr = localStorage.getItem("qurban_user");
+      if (userStr) {
+        try {
+          const u = JSON.parse(userStr);
+          return u.id;
+        } catch {}
+      }
+    }
+    return null;
+  };
+
   const handleAddSaving = async (e) => {
     e.preventDefault()
     setAddSavingLoading(true)
@@ -85,7 +100,7 @@ export function useDashboardActions({
 
       const { data, error } = await supabase.from("tabungan").insert({
         TransaksiId: newTransactionId,
-        UserId: user.id,
+        UserId: getUserId(),
         Jumlah: amount,
         Metode: profile.MetodeTabungan,
         Tanggal: newTanggal,
@@ -103,7 +118,7 @@ export function useDashboardActions({
         [
           {
             TransaksiId: newTransactionId,
-            UserId: user.id,
+            UserId: getUserId(),
             Jumlah: amount,
             Metode: profile.MetodeTabungan,
             Tanggal: newTanggal,
@@ -160,7 +175,7 @@ export function useDashboardActions({
 
       const { data, error } = await supabase.from("tabungan").insert({
         TransaksiId: newTransactionId,
-        UserId: user.id,
+        UserId: getUserId(),
         Jumlah: usedAmount,
         Tanggal: newTanggal,
         Tipe: "Penggunaan",
@@ -224,7 +239,7 @@ export function useDashboardActions({
         name: initialProofFile.name,
         mimeType: initialProofFile.type,
         data: await readFileAsBase64(initialProofFile),
-        userId: user.id,
+        userId: getUserId(),
         transactionId: newTransactionId,
       }
       const uploadResponse = await fetch("/api/upload-file", {
@@ -242,7 +257,7 @@ export function useDashboardActions({
 
       const { data: savingData, error: savingError } = await supabase.from("tabungan").insert({
         TransaksiId: newTransactionId,
-        UserId: user.id,
+        UserId: getUserId(),
         Jumlah: appConfig.InitialDepositAmount,
         Metode: "Setoran Awal",
         Tanggal: newTanggal,
@@ -259,7 +274,7 @@ export function useDashboardActions({
       const { error: updateError } = await supabase
         .from("users")
         .update({ IsInitialDepositMade: true, InitialDepositStatus: "Pending" })
-        .eq("UserId", user.id)
+        .eq("UserId", getUserId())
 
       if (updateError) {
         throw updateError
@@ -273,7 +288,7 @@ export function useDashboardActions({
         [
           {
             TransaksiId: newTransactionId,
-            UserId: user.id,
+            UserId: getUserId(),
             Jumlah: appConfig.InitialDepositAmount,
             Metode: "Setoran Awal",
             Tanggal: newTanggal,
@@ -301,15 +316,17 @@ export function useDashboardActions({
     const transferProofFile = e.target.elements.transferProofFile?.files[0]
     const confirmMessageEl = document.getElementById("confirmMessage")
 
-    if (transferAmount !== 2650000) {
-      confirmMessageEl.textContent = "Jumlah transfer harus tepat Rp 2.650.000."
+    const targetAmount = profile?.TargetPribadi || 2650000
+
+    if (transferAmount !== targetAmount) {
+      confirmMessageEl.textContent = `Jumlah transfer harus tepat ${formatRupiah(targetAmount)}.`
       confirmMessageEl.className = "text-sm mt-3 text-red-600"
       setConfirmTransferLoading(false)
       return
     }
 
-    if (personalTotalRecorded < (globalConfig?.TargetForTransfer || 0)) {
-      confirmMessageEl.textContent = `Dana tercatat belum mencapai target transfer ${formatRupiah(globalConfig?.TargetForTransfer || 0)}.`
+    if (personalTotalRecorded < targetAmount) {
+      confirmMessageEl.textContent = `Dana tercatat belum mencapai target transfer ${formatRupiah(targetAmount)}.`
       confirmMessageEl.className = "text-sm mt-3 text-red-600"
       setConfirmTransferLoading(false)
       return
@@ -324,7 +341,7 @@ export function useDashboardActions({
         name: transferProofFile.name,
         mimeType: transferProofFile.type,
         data: await readFileAsBase64(transferProofFile),
-        userId: user.id,
+        userId: getUserId(),
         transactionId: newConfirmationId,
       }
       const uploadResponse = await fetch("/api/upload-file", {
@@ -342,7 +359,7 @@ export function useDashboardActions({
 
       const { data, error } = await supabase.from("transfer_confirmations").insert({
         ConfirmationId: newConfirmationId,
-        UserId: user.id,
+        UserId: getUserId(),
         Amount: transferAmount,
         ProofLink: proofUrl,
         Timestamp: newTimestamp,
@@ -358,7 +375,7 @@ export function useDashboardActions({
         [
           {
             ConfirmationId: newConfirmationId,
-            UserId: user.id,
+            UserId: getUserId(),
             Amount: transferAmount,
             ProofLink: proofUrl,
             Timestamp: newTimestamp,
@@ -404,7 +421,7 @@ export function useDashboardActions({
 
       const { data, error } = await supabase.from("help_desk_tickets").insert({
         TicketId: newTicketId,
-        UserId: user.id,
+        UserId: getUserId(),
         Question: question,
         Timestamp: newTimestamp,
         Status: "Open",
@@ -418,7 +435,7 @@ export function useDashboardActions({
         [
           {
             TicketId: newTicketId,
-            UserId: user.id,
+            UserId: getUserId(),
             Question: question,
             Timestamp: newTimestamp,
             Status: "Open",
@@ -448,6 +465,54 @@ export function useDashboardActions({
     }
   }
 
+  const handleEditTransaction = async (updatedTransaction) => {
+    try {
+      const { error } = await supabase
+        .from("tabungan")
+        .update({
+          Jumlah: updatedTransaction.Jumlah,
+          Tanggal: updatedTransaction.Tanggal,
+        })
+        .eq("TransaksiId", updatedTransaction.TransaksiId)
+        .eq("UserId", user.id)
+
+      if (error) {
+        throw error
+      }
+
+      // Update local state
+      setPersonalSavingHistory((prev) => {
+        const updated = prev
+          .map((item) =>
+            item.TransaksiId === updatedTransaction.TransaksiId
+              ? { ...item, Jumlah: updatedTransaction.Jumlah, Tanggal: updatedTransaction.Tanggal }
+              : item,
+          )
+          .sort((a, b) => new Date(b.Tanggal) - new Date(a.Tanggal))
+
+        // Recalculate totals
+        let newTotalRecorded = 0
+        let newTotalUsed = 0
+        updated.forEach((item) => {
+          if (item.Tipe === "Setoran") {
+            newTotalRecorded += item.Jumlah || 0
+          } else if (item.Tipe === "Penggunaan") {
+            newTotalUsed += item.Jumlah || 0
+          }
+        })
+        setPersonalTotalRecorded(newTotalRecorded)
+        setPersonalUsed(newTotalUsed)
+
+        return updated
+      })
+
+      console.log("Transaksi berhasil diperbarui:", updatedTransaction.TransaksiId)
+    } catch (err) {
+      console.error("Error editing transaction:", err.message)
+      alert("Gagal memperbarui transaksi: " + err.message)
+    }
+  }
+
   const handleDeleteSaving = async (transactionId) => {
     try {
       // Ambil data transaksi yang akan dihapus (termasuk ProofLink)
@@ -455,11 +520,11 @@ export function useDashboardActions({
         .from("tabungan")
         .select("Tipe, Metode, ProofLink")
         .eq("TransaksiId", transactionId)
-        .eq("UserId", user.id)
+        .eq("UserId", getUserId())
         .single()
       if (trxError) throw trxError
 
-      const { error } = await supabase.from("tabungan").delete().eq("TransaksiId", transactionId).eq("UserId", user.id)
+      const { error } = await supabase.from("tabungan").delete().eq("TransaksiId", transactionId).eq("UserId", getUserId())
       if (error) {
         throw error
       }
@@ -482,7 +547,7 @@ export function useDashboardActions({
         const { error: userError } = await supabase
           .from("users")
           .update({ IsInitialDepositMade: false, InitialDepositStatus: null })
-          .eq("UserId", user.id)
+          .eq("UserId", getUserId())
         if (userError) throw userError
         setProfile((prev) => ({ ...prev, IsInitialDepositMade: false, InitialDepositStatus: null }))
       }
@@ -516,11 +581,15 @@ export function useDashboardActions({
         .from("transfer_confirmations")
         .select("ProofLink")
         .eq("ConfirmationId", confirmationId)
-        .eq("UserId", user.id)
+        .eq("UserId", getUserId())
         .single()
       if (confError) throw confError
 
-      const { error } = await supabase.from("transfer_confirmations").delete().eq("ConfirmationId", confirmationId).eq("UserId", user.id)
+      const { error } = await supabase
+        .from("transfer_confirmations")
+        .delete()
+        .eq("ConfirmationId", confirmationId)
+        .eq("UserId", getUserId())
       if (error) throw error
 
       // Jika ada ProofLink, hapus file dari Google Storage
@@ -557,6 +626,7 @@ export function useDashboardActions({
     handleConfirmTransfer,
     handleHelpDeskSubmit,
     showConfirmModal,
+    handleEditTransaction,
     handleDeleteSaving,
     handleDeleteTransferConfirmation,
   }

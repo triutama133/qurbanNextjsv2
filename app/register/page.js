@@ -1,133 +1,122 @@
-"use client";
+"use client"
 
-import { useState, useEffect } from 'react';
-import supabase from '@/lib/supabase'; // Pastikan alias ini benar
-import { useRouter } from 'next/navigation';
+import { useState } from "react"
+import supabase from "@/lib/supabase"
+import { useRouter } from "next/navigation"
 
 export default function RegisterPage() {
-  const [fullName, setFullName] = useState(''); // Nama Lengkap pemilik akun (disimpan di kolom Nama)
-  const [pequrbanName, setPequrbanName] = useState(''); // Nama Pequrban (disimpan di kolom NamaPequrban)
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState('');
-  const router = useRouter();
+  const [fullName, setFullName] = useState("")
+  const [pequrbanName, setPequrbanName] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [metodeTabungan, setMetodeTabungan] = useState("Qurban di Tim") // "Qurban di Tim" atau "Qurban Sendiri"
+  const [customTarget, setCustomTarget] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState("")
+  const [messageType, setMessageType] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
+  const router = useRouter()
+
+  const formatRupiah = (amount) => {
+    return new Intl.NumberFormat("id-ID", {
+      style: "currency",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  const calculateMonthlyRecommendation = (target) => {
+    const months = 12 // Asumsi 12 bulan untuk mencapai target
+    return Math.ceil(target / months)
+  }
 
   const handleSignUp = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage('');
-    setMessageType('');
+    e.preventDefault()
+    setLoading(true)
+    setMessage("")
+    setMessageType("")
 
     if (password !== confirmPassword) {
-      setMessage('Password dan konfirmasi password tidak cocok.');
-      setMessageType('error');
-      setLoading(false);
-      return;
+      setMessage("Password dan konfirmasi password tidak cocok.")
+      setMessageType("error")
+      setLoading(false)
+      return
     }
 
-    // 1. Pendaftaran user baru di Supabase Auth
-    // PERBAIKAN: Jangan panggil supabase.auth.signUp dulu jika email sudah terdaftar di public.users
-    // Ini untuk menghindari user dibuat di auth.users jika public.users tidak mau terima
-    // Namun, kita akan tetap coba daftar di auth.users terlebih dahulu karena SupabaseAuth yang utama.
-    // Jika auth.signUp gagal karena email duplikat, errornya akan ditangkap.
-    // Jika auth.signUp berhasil, baru kita cek public.users.
-
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: email,
-      password: password,
-    });
-
-    // PERBAIKAN: Tangani error dari supabase.auth.signUp terlebih dahulu
-    if (authError) {
-        if (authError.message.includes('User already registered')) { // Pesan error spesifik dari Supabase Auth untuk duplikasi email
-            setMessage('Email ini sudah terdaftar. Silakan login.');
-            setMessageType('error');
-        } else {
-            setMessage(`Pendaftaran gagal: ${authError.message}`);
-            setMessageType('error');
-        }
-        setLoading(false);
-        return;
-    }
-
-    if (authData.user) {
-      // 2. Jika pendaftaran di Supabase Auth berhasil, simpan data tambahan ke tabel public.users
-      try {
-        const userId = authData.user.id;
-
-        const response = await fetch('/api/register-user', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: userId,
-            fullName: fullName,
-            pequrbanName: pequrbanName,
-            email: email,
-            metodeTabungan: "Menabung Sendiri",
-          }),
-        });
-
-        const result = await response.json();
-
-        // PERBAIKAN: Tangani status kode 409 (Conflict) secara spesifik
-        if (response.status === 409) {
-          // Jika email sudah terdaftar di public.users, meskipun auth.signUp berhasil (jarang, tapi bisa)
-          // Hapus user dari auth.users untuk konsistensi
-          await supabase.auth.admin.deleteUser(userId); // Perlu service_role_key di API Route untuk ini
-          setMessage('Email ini sudah terdaftar di sistem. Silakan login.');
-          setMessageType('error');
-          setLoading(false);
-          return;
-        }
-
-        if (!response.ok || result.error) {
-          throw new Error(result.error || 'Gagal menyimpan data profil.');
-        }
-
-        setMessage('Pendaftaran berhasil! Silakan login.');
-        setMessageType('success');
-        setTimeout(() => {
-          router.push('/login');
-        }, 2000);
-
-      } catch (profileError) {
-        console.error('Error saving user profile:', profileError.message);
-        // PERBAIKAN: Jika gagal menyimpan profil, HAPUS user dari Supabase Auth
-        // Ini SANGAT PENTING untuk konsistensi data
-        await supabase.auth.admin.deleteUser(authData.user.id); // Ini harus dipanggil dari sisi SERVER!
-        // Untuk saat ini, kita akan asumsikan ini perlu API Route juga
-        // Atau: Anda perlu membuat API Route baru (misalnya '/api/delete-auth-user')
-        // Dan panggil route itu di sini jika profileError terjadi.
-        console.error("User created in Auth but not in public.users. Please manually delete or implement cleanup API.");
-        setMessage(`Pendaftaran berhasil di autentikasi, tetapi gagal menyimpan data profil: ${profileError.message}. Silakan hubungi admin.`);
-        setMessageType('error');
+    // Validasi target custom jika qurban sendiri
+    let targetAmount = 2650000 // Default untuk Qurban di Tim
+    if (metodeTabungan === "Qurban Sendiri") {
+      const customAmount = Number.parseInt(customTarget.replace(/[^0-9]/g, ""))
+      if (!customAmount || customAmount < 500000) {
+        setMessage("Target tabungan minimal Rp 500.000 untuk Qurban Sendiri.")
+        setMessageType("error")
+        setLoading(false)
+        return
       }
-    } else {
-        // Ini bisa terjadi jika email confirmation diperlukan tapi belum diaktifkan
-        setMessage('Pendaftaran berhasil. Silakan cek email Anda untuk konfirmasi (jika diaktifkan).');
-        setMessageType('success');
-        setTimeout(() => {
-            router.push('/login');
-        }, 3000);
+      targetAmount = customAmount
     }
-    setLoading(false);
-  };
+
+    // Generate userId (UUID v4)
+    const userId = crypto.randomUUID ? crypto.randomUUID() : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
+
+    // Log payload ke console sebelum request
+    console.log("Payload:", {
+      UserId: userId,
+      Nama: fullName,
+      NamaPequrban: pequrbanName,
+      phone_number: phoneNumber,
+      Email: email,
+      MetodeTabungan: metodeTabungan,
+      TargetPribadi: targetAmount,
+    })
+    const response = await fetch("/api/register-user", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        UserId: userId,
+        Nama: fullName,
+        NamaPequrban: pequrbanName,
+        phone_number: phoneNumber,
+        Email: email,
+        MetodeTabungan: metodeTabungan,
+        TargetPribadi: targetAmount,
+        Password: password,
+      }),
+    })
+
+    const result = await response.json()
+
+    if (response.status === 409) {
+      setMessage("Email ini sudah terdaftar di sistem. Silakan login.")
+      setMessageType("error")
+      setLoading(false)
+      return
+    }
+
+    if (!response.ok || result.error) {
+      setMessage(result.error || "Gagal menyimpan data profil.")
+      setMessageType("error")
+      setLoading(false)
+      return
+    }
+
+    setMessage("Pendaftaran berhasil! Silakan login.")
+    setMessageType("success")
+    setTimeout(() => {
+      router.push("/login")
+    }, 5000)
+    setLoading(false)
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
         <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Daftar Akun Baru
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Daftar untuk ikut program tabungan qurban
-          </p>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Daftar Akun Baru</h2>
+          <p className="mt-2 text-center text-sm text-gray-600">Daftar untuk ikut program tabungan qurban</p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSignUp}>
           <div className="rounded-md shadow-sm space-y-4">
@@ -179,6 +168,83 @@ export default function RegisterPage() {
               />
             </div>
             <div>
+              <label htmlFor="phone-number" className="block text-sm font-medium text-gray-700 mb-1">
+                Nomor HP
+              </label>
+              <input
+                id="phone-number"
+                name="phone-number"
+                type="tel"
+                autoComplete="tel"
+                required
+                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="08xxxxxxxxxx"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9+]/g, ""))}
+              />
+            </div>
+
+            {/* Metode Qurban Selection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Metode Qurban</label>
+              <div className="space-y-2">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="metode-tabungan"
+                    value="Qurban di Tim"
+                    checked={metodeTabungan === "Qurban di Tim"}
+                    onChange={(e) => setMetodeTabungan(e.target.value)}
+                    className="mr-2"
+                  />
+                  <span className="text-sm text-gray-700">Qurban di Tim (Target: {formatRupiah(2650000)})</span>
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="metode-tabungan"
+                    value="Qurban Sendiri"
+                    checked={metodeTabungan === "Qurban Sendiri"}
+                    onChange={(e) => setMetodeTabungan(e.target.value)}
+                    className="mr-2"
+                  />
+                  <span className="text-sm text-gray-700">Qurban Sendiri (Target Custom)</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Custom Target Input for Qurban Sendiri */}
+            {metodeTabungan === "Qurban Sendiri" && (
+              <div>
+                <label htmlFor="custom-target" className="block text-sm font-medium text-gray-700 mb-1">
+                  Target Tabungan Custom
+                </label>
+                <input
+                  id="custom-target"
+                  name="custom-target"
+                  type="text"
+                  required
+                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  placeholder="Masukkan target tabungan (contoh. Rp 2.500.000)"
+                  value={customTarget}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9]/g, "")
+                    const formatted = value ? Number.parseInt(value, 10).toLocaleString("id-ID") : ""
+                    setCustomTarget(formatted)
+                  }}
+                />
+                {customTarget && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Rekomendasi tabungan per bulan:{" "}
+                    {formatRupiah(
+                      calculateMonthlyRecommendation(Number.parseInt(customTarget.replace(/[^0-9]/g, "")) || 0)
+                    )}
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                 Password
               </label>
@@ -212,11 +278,10 @@ export default function RegisterPage() {
             </div>
           </div>
 
-
           {message && (
             <div
               className={`py-2 px-3 rounded-md text-sm ${
-                messageType === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                messageType === "error" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
               }`}
             >
               {message}
@@ -227,20 +292,20 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
             >
-              {loading ? 'Memproses...' : 'Daftar'}
+              {loading ? "Memproses..." : "Daftar"}
             </button>
           </div>
         </form>
-        
+
         <p className="mt-8 text-center text-sm text-gray-600">
-            Sudah punya akun?{' '}
-            <a href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
-              Masuk di sini
-            </a>
+          Sudah punya akun?{" "}
+          <a href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+            Masuk di sini
+          </a>
         </p>
       </div>
     </div>
-  );
+  )
 }

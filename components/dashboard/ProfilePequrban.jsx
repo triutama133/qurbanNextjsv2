@@ -14,6 +14,7 @@ export default function ProfilePequrban({ profile, loadingProfile }) {
             </p>
             <p>
               <strong>Status Pequrban:</strong>{" "}
+              {/* Status utama */}
               {profile.StatusPequrban && Array.isArray(profile.StatusPequrban) && profile.StatusPequrban.length > 0 ? (
                 profile.StatusPequrban.map((statusItem, index) => (
                   <span
@@ -24,8 +25,16 @@ export default function ProfilePequrban({ profile, loadingProfile }) {
                   </span>
                 ))
               ) : (
-                <span className="font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800">Normal</span>
+                <span className="font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800 mr-1 mb-1 inline-block">Normal</span>
               )}
+              {/* Status tambahan */}
+              {!profile.IsInitialDepositMade ? (
+                <span className="font-semibold px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 mr-1 mb-1 inline-block">Belum Setor</span>
+              ) : profile.InitialDepositStatus === "Pending" ? (
+                <span className="font-semibold px-2 py-1 rounded-full bg-orange-100 text-orange-800 mr-1 mb-1 inline-block">Pending Verification</span>
+              ) : profile.InitialDepositStatus === "Approved" ? (
+                <span className="font-semibold px-2 py-1 rounded-full bg-green-100 text-green-800 mr-1 mb-1 inline-block">Verified</span>
+              ) : null}
             </p>
             {profile.Benefits && profile.Benefits.length > 0 ? (
               <p>

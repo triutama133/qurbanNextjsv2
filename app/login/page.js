@@ -19,56 +19,42 @@ export default function LoginPage() {
   const handleSignIn = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setMessage('');
-    setMessageType('');
+    setMessage("");
+    setMessageType("");
 
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: email,
-      password: password,
-    });
-
-    if (authError) {
-      setMessage(`Login gagal: ${authError.message}`);
-      setMessageType('error');
-      setLoading(false);
-      return;
-    }
-
-    if (authData.user) {
-      // Setelah login Supabase Auth berhasil, verifikasi role di tabel public.users
-      try {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('Role')
-          .eq('UserId', authData.user.id)
-          .single();
-
-        if (userError || !userData) {
-          // Jika tidak ditemukan di public.users, kemungkinan data profil belum lengkap
-          // Logout user dan arahkan ke halaman setup profil atau register lagi
-          await supabase.auth.signOut();
-          setMessage('Login berhasil, tetapi data profil tidak ditemukan. Silakan hubungi admin atau daftar ulang.');
-          setMessageType('error');
-          console.error('User profile not found in public.users:', authData.user.id);
-        } else if (userData.Role === 'Admin') {
-          setMessage('Login admin berhasil! Mengarahkan ke dashboard admin...');
-          setMessageType('success');
-          setTimeout(() => {
-            router.push('/admin-dashboard');
-          }, 1500);
-        } else { // Role adalah 'User'
-          setMessage('Login user berhasil! Mengarahkan ke dashboard...');
-          setMessageType('success');
-          setTimeout(() => {
-            router.push('/dashboard');
-          }, 1500);
-        }
-      } catch (roleError) {
-        console.error('Error fetching user role:', roleError.message);
-        setMessage('Login gagal: Terjadi kesalahan saat memeriksa peran akun.');
-        setMessageType('error');
-        await supabase.auth.signOut(); // Pastikan user logout jika ada error
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ Email: email, Password: password })
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setMessage(result.error || "Login gagal.");
+        setMessageType("error");
+        setLoading(false);
+        return;
       }
+      // Simpan user ke localStorage, tambahkan properti id
+      const userWithId = { ...result.user, id: result.user.UserId };
+      localStorage.setItem("qurban_user", JSON.stringify(userWithId));
+      // Login sukses, cek role
+      if (result.user.Role === "Admin") {
+        setMessage("Login admin berhasil! Mengarahkan ke dashboard admin...");
+        setMessageType("success");
+        setTimeout(() => {
+          router.push("/admin-dashboard");
+        }, 1500);
+      } else {
+        setMessage("Login user berhasil! Mengarahkan ke dashboard...");
+        setMessageType("success");
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 1500);
+      }
+    } catch (err) {
+      setMessage("Login gagal: " + err.message);
+      setMessageType("error");
     }
     setLoading(false);
   };
@@ -77,13 +63,20 @@ export default function LoginPage() {
     e.preventDefault();
     setForgotLoading(true);
     setForgotMsg('');
-    const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
-      redirectTo: `${window.location.origin}/reset-password`
-    });
-    if (error) {
-      setForgotMsg(`Gagal mengirim email reset: ${error.message}`);
-    } else {
-      setForgotMsg('Email reset password telah dikirim. Silakan cek inbox/spam Anda.');
+    try {
+      const res = await fetch('/api/reset-password-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail })
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setForgotMsg(`Gagal mengirim email reset: ${result.error || 'Terjadi kesalahan.'}`);
+      } else {
+        setForgotMsg('Email reset password telah dikirim. Silakan cek inbox/spam Anda.');
+      }
+    } catch (err) {
+      setForgotMsg('Gagal mengirim email reset: ' + err.message);
     }
     setForgotLoading(false);
   };

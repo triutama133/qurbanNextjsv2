@@ -68,12 +68,37 @@ export async function GET(req) {
     .from('tabungan')
     .select('*');
 
-  // 10. Notifikasi setoran awal pending
-  const { data: setoranPending } = await supabase
+
+
+  // 10. Notifikasi setoran awal pending (hanya user, exclude admin, dan IsInitialDepositMade true)
+  const { data: setoranPendingUsers } = await supabase
     .from('users')
-    .select('UserId, Nama, Email')
-    .eq('IsInitialDepositMade', false)
-    .eq('InitialDepositStatus', 'Pending');
+    .select('UserId, Nama, Email, Role, IsInitialDepositMade, InitialDepositStatus')
+    .eq('IsInitialDepositMade', true)
+    .eq('InitialDepositStatus', 'Pending')
+    .not('Role', 'eq', 'admin');
+
+  // Ambil data tabungan untuk user-user pending (Metode=Setoran Awal, VerificationStatus=Pending)
+  let setoranPending = [];
+  if (setoranPendingUsers && setoranPendingUsers.length > 0) {
+    const userIds = setoranPendingUsers.map(u => u.UserId);
+    const { data: tabunganSetoran } = await supabase
+      .from('tabungan')
+      .select('UserId, Jumlah, ProofLink, VerificationStatus, Metode')
+      .in('UserId', userIds)
+      .eq('Metode', 'Setoran Awal')
+      .eq('VerificationStatus', 'Pending');
+
+    setoranPending = setoranPendingUsers.map(user => {
+      // Ambil data tabungan terkait user ini
+      const tabungan = (tabunganSetoran || []).find(t => t.UserId === user.UserId);
+      return {
+        ...user,
+        Amount: tabungan ? tabungan.Jumlah : null,
+        ProofLink: tabungan ? tabungan.ProofLink : null,
+      };
+    });
+  }
 
   // 11. Verifikasi transfer pending
   const { data: transferPending } = await supabase

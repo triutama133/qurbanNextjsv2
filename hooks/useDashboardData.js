@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import supabase from "@/lib/supabase"
 
 export function useDashboardData() {
   // States
@@ -37,12 +36,12 @@ export function useDashboardData() {
   const NEWS_PER_PAGE = 3
 
   // Fetch Functions
-  const fetchUserAndInit = useCallback(async (router) => {
+  // Ambil user dari localStorage dan redirect jika tidak ada
+  const fetchUserAndInit = useCallback((router) => {
     setError(null)
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const userStr = typeof window !== 'undefined' ? localStorage.getItem("qurban_user") : null;
+      const user = userStr ? JSON.parse(userStr) : null;
       if (!user) {
         router.push("/login")
         return
@@ -54,15 +53,13 @@ export function useDashboardData() {
     }
   }, [])
 
+  // Ambil profil user dari API custom
   const fetchProfile = useCallback(async (userId) => {
     setLoadingProfile(true)
     try {
-      const { data: profileData, error: profileError } = await supabase
-        .from("users")
-        .select('*, "NamaPequrban", "StatusPequrban", "Benefits", "IsInitialDepositMade"')
-        .eq("UserId", userId)
-        .single()
-      if (profileError || !profileData) throw new Error(profileError?.message || "Data profil tidak ditemukan.")
+      const res = await fetch(`/api/get-user-profile?userId=${userId}`)
+      if (!res.ok) throw new Error("Gagal memuat profil.")
+      const profileData = await res.json()
       setProfile(profileData)
     } catch (err) {
       setError(err.message || "Gagal memuat profil.")
@@ -71,16 +68,13 @@ export function useDashboardData() {
     }
   }, [])
 
+  // Ambil konfigurasi global dari API custom
   const fetchAppConfigSection = useCallback(async () => {
     setLoadingAppConfig(true)
     try {
-      const { data: configData, error: configError } = await supabase
-        .from("app_config")
-        .select("*")
-        .eq("id", "global_settings")
-        .single()
-      if (configError || !configData)
-        throw new Error(configError?.message || "Data konfigurasi global tidak ditemukan.")
+      const res = await fetch(`/api/get-app-config`)
+      if (!res.ok) throw new Error("Gagal memuat konfigurasi global.")
+      const configData = await res.json()
       setAppConfig(configData)
     } catch (err) {
       setError(err.message || "Gagal memuat konfigurasi global.")
@@ -89,50 +83,79 @@ export function useDashboardData() {
     }
   }, [])
 
+  // Ambil data tabungan, penggunaan, dan transfer user dari API custom
   const fetchPersonalSectionData = useCallback(async (userId, currentProfile, currentAppConfig) => {
     setLoadingPersonal(true)
     try {
-      const { data: savingHistoryData, error: savingHistoryError } = await supabase
-        .from("tabungan")
-        .select("*")
-        .eq("UserId", userId)
-        .order("Tanggal", { ascending: false })
-      if (savingHistoryError) throw savingHistoryError
+      const res = await fetch(`/api/get-user-savings?userId=${userId}`)
+      if (!res.ok) throw new Error("Gagal memuat data tabungan.")
+      const savingHistoryData = await res.json()
       setPersonalSavingHistory(savingHistoryData)
 
-
-      // Hitung semua setoran ("Setoran") dan transfer ke panitia ("Transfer"), keduanya masuk ke tabungan tercatat
+      // Perhitungan sama seperti sebelumnya
       let totalRecorded = 0
       let totalUsed = 0
+      let initialDepositIncluded = false;
       savingHistoryData.forEach((item) => {
-        if (item.Tipe === "Setoran" || item.Tipe === "Transfer") {
-          totalRecorded += item.Jumlah || 0
+        if (item.Tipe === "Setoran") {
+          if (item.Metode === "Setoran Awal") {
+            initialDepositIncluded = true;
+            if (currentProfile?.InitialDepositStatus === "Approved") {
+              totalRecorded += item.Jumlah || 0;
+            }
+          } else {
+            totalRecorded += item.Jumlah || 0;
+          }
         } else if (item.Tipe === "Penggunaan") {
-          totalUsed += item.Jumlah || 0
+          totalUsed += item.Jumlah || 0;
         }
-      })
-      setPersonalTotalRecorded(totalRecorded)
-      setPersonalUsed(totalUsed)
-
-      const { data: transferData, error: transferError } = await supabase
-        .from("transfer_confirmations")
-        .select("*")
-        .eq("UserId", userId)
-        .eq("Status", "Approved")
-        .order("Timestamp", { ascending: false })
-      if (transferError) throw transferError
-
-      let totalTransferredApproved = transferData.reduce((sum, item) => sum + (item.Amount || 0), 0)
-
-      if (currentProfile?.InitialDepositStatus === "Approved" && currentAppConfig?.InitialDepositAmount) {
-        totalTransferredApproved += currentAppConfig.InitialDepositAmount
+      });
+      if (!initialDepositIncluded && currentProfile?.InitialDepositStatus === "Approved" && currentAppConfig?.InitialDepositAmount) {
+        totalRecorded += currentAppConfig.InitialDepositAmount;
       }
+      setPersonalTotalRecorded(totalRecorded);
+      setPersonalUsed(totalUsed);
 
-      setPersonalTransferConfirmations(transferData)
-      setPersonalTransferred(totalTransferredApproved)
+      // Ambil data transfer pelunasan dari API custom
+      const resTransfer = await fetch(`/api/get-user-transfers?userId=${userId}`)
+      if (!resTransfer.ok) throw new Error("Gagal memuat data transfer.")
+      const transferData = await resTransfer.json()
+
+      // Ambil data setoran awal yang sudah transfer & approved
+      let initialDepositTransfer = null;
+      if (currentProfile?.InitialDepositStatus === "Approved" && currentAppConfig?.InitialDepositAmount) {
+        const initialDeposit = savingHistoryData.find(
+          (item) => item.Tipe === "Setoran" && item.Metode === "Setoran Awal" && item.ProofLink
+        );
+        if (initialDeposit) {
+          initialDepositTransfer = {
+            ConfirmationId: `initial-${initialDeposit.TabunganId || initialDeposit.id || Math.random()}`,
+            Amount: initialDeposit.Jumlah || currentAppConfig.InitialDepositAmount,
+            Timestamp: initialDeposit.Tanggal || initialDeposit.CreatedAt || new Date().toISOString(),
+            Status: "Approved",
+            ProofLink: initialDeposit.ProofLink,
+            Type: "Setoran Awal",
+          };
+        } else {
+          initialDepositTransfer = {
+            ConfirmationId: `initial-${userId}`,
+            Amount: currentAppConfig.InitialDepositAmount,
+            Timestamp: currentProfile.InitialDepositDate || new Date().toISOString(),
+            Status: "Approved",
+            ProofLink: currentProfile.InitialDepositProof || null,
+            Type: "Setoran Awal",
+          };
+        }
+      }
+      let allTransfers = [...transferData];
+      if (initialDepositTransfer) {
+        allTransfers = [initialDepositTransfer, ...allTransfers];
+      }
+      let totalTransferredApproved = allTransfers.reduce((sum, item) => sum + (item.Amount || 0), 0);
+      setPersonalTransferConfirmations(allTransfers);
+      setPersonalTransferred(totalTransferredApproved);
     } catch (err) {
       setError(err.message || "Gagal memuat data keuangan pribadi.")
-      console.error("fetchPersonalSectionData error:", err)
       setPersonalSavingHistory([])
       setPersonalTransferConfirmations([])
       setPersonalTotalRecorded(0)
@@ -143,20 +166,13 @@ export function useDashboardData() {
     }
   }, [])
 
+  // Ambil berita dari API custom
   const fetchNewsSection = useCallback(async (page = 1) => {
     setLoadingNews(true)
     try {
-      const offset = (page - 1) * NEWS_PER_PAGE
-      const {
-        data: newsData,
-        error: newsError,
-        count,
-      } = await supabase
-        .from("newsletters")
-        .select("*", { count: "exact" })
-        .order("DatePublished", { ascending: false })
-        .range(offset, offset + NEWS_PER_PAGE - 1)
-      if (newsError) throw newsError
+      const res = await fetch(`/api/get-news?page=${page}`)
+      if (!res.ok) throw new Error("Gagal memuat berita.")
+      const { newsData, count } = await res.json()
       setNews(newsData)
       setNewsTotal(count)
     } catch (err) {
@@ -166,20 +182,14 @@ export function useDashboardData() {
     }
   }, [])
 
+  // Ambil milestones dari API custom
   const fetchMilestonesSection = useCallback(async () => {
     setLoadingMilestones(true)
     try {
-      const { data: milestonesData, error: milestonesError } = await supabase
-        .from("program_milestones")
-        .select("*")
-        .order("Year", { ascending: true })
-        .order("Order", { ascending: true })
-      if (milestonesError) {
-        if (milestonesError.code === "PGRST116") setMilestones([])
-        else throw milestonesError
-      } else {
-        setMilestones(milestonesData)
-      }
+      const res = await fetch(`/api/get-milestones`)
+      if (!res.ok) throw new Error("Gagal memuat milestone.")
+      const milestonesData = await res.json()
+      setMilestones(milestonesData)
     } catch (err) {
       setError(err.message || "Gagal memuat milestone.")
     } finally {
@@ -187,15 +197,13 @@ export function useDashboardData() {
     }
   }, [])
 
+  // Ambil tiket helpdesk dari API custom
   const fetchHelpDeskTicketsSection = useCallback(async (userId) => {
     setLoadingHelpDeskTickets(true)
     try {
-      const { data: ticketsData, error: ticketsError } = await supabase
-        .from("help_desk_tickets")
-        .select("*")
-        .eq("UserId", userId)
-        .order("Timestamp", { ascending: false })
-      if (ticketsError) throw ticketsError
+      const res = await fetch(`/api/get-helpdesk-tickets?userId=${userId}`)
+      if (!res.ok) throw new Error("Gagal memuat tiket helpdesk.")
+      const ticketsData = await res.json()
       setUserHelpDeskTickets(ticketsData)
     } catch (err) {
       setError(err.message || "Gagal memuat tiket helpdesk.")
@@ -204,25 +212,16 @@ export function useDashboardData() {
     }
   }, [])
 
+  // Ambil dokumen/sumber daya dari API custom
   const fetchResourcesSection = useCallback(async (userId) => {
     setLoadingDocuments(true)
     try {
-      const { data: resourcesData, error: resourcesError } = await supabase
-        .from("app_resources")
-        .select("*")
-        .or(`IsGlobal.eq.true,UserId.eq.${userId}`)
-        .order("CreatedAt", { ascending: false })
-
-      if (resourcesData === null) {
-        setDocuments([])
-      } else if (resourcesError) {
-        throw resourcesError
-      } else {
-        setDocuments(resourcesData)
-      }
+      const res = await fetch(`/api/get-resources?userId=${userId}`)
+      if (!res.ok) throw new Error("Gagal memuat dokumen dan sumber daya.")
+      const resourcesData = await res.json()
+      setDocuments(resourcesData)
     } catch (err) {
       setError(err.message || "Gagal memuat dokumen dan sumber daya.")
-      console.error("fetchResourcesSection error:", err)
       setDocuments([])
     } finally {
       setLoadingDocuments(false)

@@ -1,8 +1,18 @@
 "use client"
-
-
-import { useState } from "react"
 import { SmallSpinner } from "./LoadingSkeletons"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+import { Trash2 } from "lucide-react"
 
 export default function TransactionForms({
   profile,
@@ -23,21 +33,49 @@ export default function TransactionForms({
   handleDeleteTransferConfirmation,
   formatRupiah,
 }) {
-
   const isInitialDepositMade = profile?.IsInitialDepositMade
 
-  // State untuk modal konfirmasi hapus setoran
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [deleteTargetId, setDeleteTargetId] = useState(null)
-  const [deleteTargetLabel, setDeleteTargetLabel] = useState("")
+
+  // Cek status pelunasan (bukan setoran awal)
+  const pelunasanList = personalTransferConfirmations?.filter(
+    (item) => item.Type !== "Setoran Awal"
+  ) || [];
+  const pelunasanPending = pelunasanList.some(item => item.Status === "Pending");
+  const pelunasanApproved = pelunasanList.some(item => item.Status === "Approved");
+  const pelunasanRejected = pelunasanList.some(item => item.Status === "Rejected");
+  const pelunasanSudahUpload = pelunasanList.length > 0;
+
+  // Hitung total pelunasan yang sudah diapprove
+  const totalPelunasanApproved = pelunasanList
+    .filter(item => item.Status === "Approved")
+    .reduce((sum, item) => sum + (item.Amount || 0), 0);
+  const totalSetoranAwal = profile?.IsInitialDepositMade && profile?.InitialDepositStatus === "Approved" ? (appConfig?.InitialDepositAmount || 300000) : 0;
+  const targetPelunasan = (profile?.TargetPribadi || 2650000);
+  const sudahLunas = (totalPelunasanApproved + totalSetoranAwal) >= targetPelunasan;
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg">
       <div className="mb-4">
         <h3 className="text-lg font-bold text-gray-900 mb-2">Pencatatan Transaksi</h3>
 
+        {/* Pesan jika pelunasan pending */}
+        {pelunasanPending && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
+            <h4 className="font-semibold text-md text-yellow-800 mb-2">Menunggu Verifikasi Admin</h4>
+            <p className="text-sm text-yellow-700">Bukti pelunasan Anda sudah diupload dan sedang diverifikasi admin. Seluruh fitur pencatatan transaksi dan konfirmasi transfer dinonaktifkan sementara.</p>
+          </div>
+        )}
+
+        {/* Pesan jika pelunasan sudah lunas dan approved */}
+        {sudahLunas && pelunasanApproved && !pelunasanPending && (
+          <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-4">
+            <h4 className="font-semibold text-md text-green-800 mb-2">Pelunasan Selesai</h4>
+            <p className="text-sm text-green-700">Anda telah melakukan pelunasan penuh dan sudah diverifikasi admin. Semua fitur pencatatan transaksi dinonaktifkan.</p>
+          </div>
+        )}
+
         {/* Initial Deposit Section */}
-        {profile && !isInitialDepositMade && appConfig && (
+        {!pelunasanPending && !sudahLunas && profile && !isInitialDepositMade && appConfig && (
           <div className="border-b pb-4 mb-4">
             <h4 className="font-semibold text-md text-gray-800 mb-2">Setoran Awal Wajib</h4>
             <p className="text-sm text-gray-600 mb-2">
@@ -67,7 +105,7 @@ export default function TransactionForms({
         )}
 
         {/* Verification Status */}
-        {profile && isInitialDepositMade && profile?.InitialDepositStatus !== "Approved" && (
+        {!pelunasanPending && !sudahLunas && profile && isInitialDepositMade && profile?.InitialDepositStatus !== "Approved" && (
           <div className="border-b pb-4 mb-4">
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
               <div className="flex">
@@ -98,82 +136,12 @@ export default function TransactionForms({
         )}
 
         {/* Regular Transaction Forms */}
-        {profile && isInitialDepositMade && profile?.InitialDepositStatus === "Approved" && (
+        {!pelunasanPending && !sudahLunas && profile && isInitialDepositMade && profile?.InitialDepositStatus === "Approved" && (
           <>
-            {/* Saving History (Semua Transaksi Tabungan) */}
-            {personalSavingHistory.length > 0 && (
-              <div className="mb-6">
-                <h4 className="font-semibold text-md text-gray-800 mb-2">Riwayat Tabungan Tercatat</h4>
-                <ul className="divide-y divide-gray-200">
-                  {personalSavingHistory.map((item) => (
-                    <li key={item.TransaksiId} className="py-2 flex items-center justify-between">
-                      <div>
-                        <span className="font-medium">{formatRupiah(item.Jumlah)}</span>
-                        <span className="ml-2 text-xs px-2 py-1 rounded bg-gray-100 text-gray-700">
-                          {item.Tipe === "Setoran"
-                            ? (item.Metode === "Setoran Awal" ? "Setoran Awal" : "Setoran")
-                            : "Penggunaan"}
-                        </span>
-                        {item.ProofLink && (
-                          <a href={item.ProofLink} target="_blank" rel="noopener noreferrer" className="ml-2 text-blue-600 underline text-xs">Lihat Bukti</a>
-                        )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          console.log('Klik hapus pada tabungan:', item)
-                          setDeleteTargetId(item.TransaksiId)
-                          setDeleteTargetLabel(
-                            item.Tipe === "Setoran"
-                              ? (item.Metode === "Setoran Awal"
-                                  ? "setoran awal"
-                                  : `setoran (${formatRupiah(item.Jumlah)})`)
-                              : `penggunaan (${formatRupiah(item.Jumlah)})`
-                          )
-                          setShowDeleteModal(true)
-                          console.log('showDeleteModal after set:', true)
-                        }}
-                        className="ml-4 text-xs text-red-600 hover:underline"
-                      >
-                        Hapus
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {/* Transfer Confirmation History */}
-            {personalTransferConfirmations.length > 0 && (
-              <div className="mb-6">
-                <h4 className="font-semibold text-md text-gray-800 mb-2">Riwayat Konfirmasi Transfer ke Panitia</h4>
-                <ul className="divide-y divide-gray-200">
-                  {personalTransferConfirmations.map((item) => (
-                    <li key={item.ConfirmationId} className="py-2 flex items-center justify-between">
-                      <div>
-                        <span className="font-medium">{formatRupiah(item.Amount)}</span>
-                        {item.Status && (
-                          <span className="ml-2 text-xs px-2 py-1 rounded bg-gray-100 text-gray-700">{item.Status}</span>
-                        )}
-                        {item.ProofLink && (
-                          <a href={item.ProofLink} target="_blank" rel="noopener noreferrer" className="ml-2 text-blue-600 underline text-xs">Lihat Bukti</a>
-                        )}
-                      </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDeleteTargetId(item.ConfirmationId)
-                            setDeleteTargetLabel(`konfirmasi transfer (${formatRupiah(item.Amount)})`)
-                            setShowDeleteModal(true)
-                          }}
-                          className="ml-4 text-xs text-red-600 hover:underline"
-                        >
-                          Hapus
-                        </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            {/* Riwayat Tabungan Tercatat dihapus dari sini, hanya tampil di bawah (SavingHistory) */}
+
+            {/* Riwayat Konfirmasi Transfer ke Panitia dihapus dari sini, hanya tampil di bawah (TransferHistory) */}
+
             {/* Add Saving Form */}
             <div className="border-b pb-4 mb-4">
               <h4 className="font-semibold text-md text-gray-800 mb-2">Catat Setoran Tabungan</h4>
@@ -238,13 +206,25 @@ export default function TransactionForms({
             </div>
 
             {/* Transfer Confirmation Form */}
-            {personalTotalRecorded - personalUsed >= 2650000 && (
+            {/* Form Konfirmasi Transfer Dana ke Panitia Qurban */}
+            {personalTotalRecorded - personalUsed >= (profile?.TargetPribadi || 2650000) && !pelunasanSudahUpload && (
               <div>
                 <h4 className="font-semibold text-md text-gray-800 mb-2">Konfirmasi Transfer Dana ke Panitia Qurban</h4>
                 <p className="text-sm text-gray-600 mb-2">
-                  Unggah bukti transfer dana yang sudah Anda kirim ke rekening panitia.
+                  Unggah bukti transfer dana yang sudah Anda kirim ke rekening panitia.<br />
+                  <span className="text-xs text-gray-500">Minimal transfer Rp 2.350.000 (setelah setoran awal Rp 300.000).</span>
                 </p>
-                <form className="space-y-4" onSubmit={handleConfirmTransfer}>
+                <form className="space-y-4" onSubmit={e => {
+                  e.preventDefault();
+                  const amountInput = e.target.transferAmount;
+                  const amount = parseInt((amountInput.value || "0").replace(/[^0-9]/g, ""), 10);
+                  if (amount < 2350000) {
+                    document.getElementById("confirmMessage").textContent = "Jumlah transfer minimal Rp 2.350.000";
+                    document.getElementById("confirmMessage").className = "text-sm mt-3 text-red-600";
+                    return;
+                  }
+                  handleConfirmTransfer(e);
+                }}>
                   <div>
                     <label htmlFor="transferAmount" className="block text-sm font-medium text-gray-700">
                       Jumlah Transfer (Rp)
@@ -286,42 +266,6 @@ export default function TransactionForms({
           </>
         )}
       </div>
-      {/* Modal Konfirmasi Hapus Setoran/Transfer */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs animate-fadeIn">
-            <h4 className="font-semibold text-lg mb-2 text-gray-800">Konfirmasi Hapus</h4>
-            <p className="text-sm text-gray-700 mb-4">
-              Apakah Anda yakin ingin menghapus {deleteTargetLabel} beserta file buktinya?
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-3 py-1 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm"
-                onClick={() => setShowDeleteModal(false)}
-              >
-                Batal
-              </button>
-              <button
-                className="px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700 text-sm"
-                onClick={() => {
-                  setShowDeleteModal(false)
-                  if (deleteTargetId) {
-                    // Cek apakah id ada di saving atau transfer
-                    const isSaving = personalSavingHistory.some((item) => item.TransaksiId === deleteTargetId)
-                    if (isSaving) {
-                      handleDeleteSaving(deleteTargetId)
-                    } else {
-                      handleDeleteTransferConfirmation(deleteTargetId)
-                    }
-                  }
-                }}
-              >
-                Ya, Hapus
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

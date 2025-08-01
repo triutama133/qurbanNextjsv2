@@ -77,7 +77,7 @@ export default function PersonalProgress({
             <p className="text-2xl font-bold text-green-700">{formatRupiah(personalTotalRecorded)}</p>
           </div>
           <div className="bg-red-50 p-4 rounded-lg text-center">
-            <p className="text-sm text-gray-500">Dana Terpakai</p>
+            <p className="text-sm text-gray-500">Tabungan Terpakai</p>
             <p className="text-2xl font-bold text-red-600">{formatRupiah(personalUsed)}</p>
           </div>
           <div className="bg-blue-50 p-4 rounded-lg text-center">
@@ -89,7 +89,7 @@ export default function PersonalProgress({
               Dana Sisa Tabungan <span className="text-gray-400 text-xs">*</span>
             </p>
             <p className="text-2xl font-bold text-gray-700">
-              {formatRupiah(personalTotalRecorded - personalUsed - personalTransferred)}
+              {formatRupiah(personalTotalRecorded - personalUsed)}
             </p>
           </div>
         </div>
@@ -106,7 +106,7 @@ export default function PersonalProgress({
               </p>
             )}
             <p className="mt-2 text-xs text-gray-500">
-              <span className="font-bold">* Dana Sisa Tabungan</span>: Dana Tercatat dikurangi Dana Terpakai.
+              <span className="font-bold">* Dana Sisa Tabungan</span>: Tabungan Tercatat dikurangi Tabungan Terpakai.
             </p>
           </div>
         )}

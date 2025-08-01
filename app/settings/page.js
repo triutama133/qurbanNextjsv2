@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import supabase from '@/lib/supabase';
+// import supabase from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 export default function SettingsPage() {
@@ -21,45 +21,42 @@ export default function SettingsPage() {
   // Profile Settings State
   const [fullName, setFullName] = useState('');
   const [pequrbanName, setPequrbanName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [profileLoading, setProfileLoading] = useState(false);
   
   const router = useRouter();
 
   useEffect(() => {
-    async function fetchUserData() {
+    // Ambil user dari localStorage
+    const userStr = typeof window !== 'undefined' ? localStorage.getItem('qurban_user') : null;
+    const userObj = userStr ? JSON.parse(userStr) : null;
+    if (!userObj) {
+      router.push('/login');
+      return;
+    }
+    // Pastikan field UserId selalu ada
+    const userId = userObj.UserId || userObj.id || userObj.userid || userObj.userId;
+    setUser({ ...userObj, userId });
+    setCurrentEmail(userObj.Email || '');
+    setNewEmail(userObj.Email || '');
+
+    // Fetch profile dari API custom
+    async function fetchProfile() {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          router.push('/login');
-          return;
-        }
-        
-        setUser(user);
-        setCurrentEmail(user.email);
-        setNewEmail(user.email);
-
-        // Fetch profile data
-        const { data: profileData, error: profileError } = await supabase
-          .from('users')
-          .select('Nama, NamaPequrban')
-          .eq('UserId', user.id)
-          .single();
-
-        if (profileError) {
-          console.error('Error fetching profile:', profileError);
-        } else {
-          setProfile(profileData);
-          setFullName(profileData.Nama || '');
-          setPequrbanName(profileData.NamaPequrban || '');
-        }
+        const res = await fetch(`/api/get-user-profile?userId=${userObj.id || userObj.UserId}`);
+        if (!res.ok) throw new Error('Gagal memuat profil');
+        const profileData = await res.json();
+        setProfile(profileData);
+        setFullName(profileData.Nama || '');
+        setPequrbanName(profileData.NamaPequrban || '');
+        setPhoneNumber(profileData.phone_number || '');
       } catch (error) {
         console.error('Error:', error);
       } finally {
         setLoading(false);
       }
     }
-
-    fetchUserData();
+    fetchProfile();
   }, [router]);
 
   const handleUpdateEmail = async (e) => {
@@ -74,11 +71,17 @@ export default function SettingsPage() {
         return;
       }
 
-      const { error } = await supabase.auth.updateUser({
-        email: newEmail
+      // Kirim request ke endpoint custom
+      const res = await fetch('/api/settings-update-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id || user.UserId,
+          newEmail
+        })
       });
-
-      if (error) throw error;
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Gagal update email');
 
       messageEl.textContent = 'Email berhasil diperbarui! Silakan cek email baru Anda untuk konfirmasi.';
       messageEl.className = 'text-sm mt-3 text-green-600';
@@ -109,11 +112,19 @@ export default function SettingsPage() {
         return;
       }
 
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword
+      // Kirim request ke endpoint custom
+      // ...existing code...
+      const res = await fetch('/api/settings-update-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.userId,
+          currentPassword,
+          newPassword
+        })
       });
-
-      if (error) throw error;
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Gagal update password');
 
       messageEl.textContent = 'Password berhasil diperbarui!';
       messageEl.className = 'text-sm mt-3 text-green-600';
@@ -134,15 +145,19 @@ export default function SettingsPage() {
     const messageEl = document.getElementById('profileMessage');
 
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({
+      // Kirim request ke endpoint custom
+      const res = await fetch('/api/settings-update-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.userId,
           Nama: fullName,
           NamaPequrban: pequrbanName,
+          phone_number: phoneNumber,
         })
-        .eq('UserId', user.id);
-
-      if (error) throw error;
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Gagal update profil');
 
       messageEl.textContent = 'Profil berhasil diperbarui!';
       messageEl.className = 'text-sm mt-3 text-green-600';
@@ -257,6 +272,19 @@ export default function SettingsPage() {
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Ubah Password</h3>
                 <form onSubmit={handleUpdatePassword} className="space-y-4">
                   <div>
+                    <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700">
+                      Password Lama
+                    </label>
+                    <input
+                      type="password"
+                      id="currentPassword"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      required
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                    />
+                  </div>
+                  <div>
                     <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">
                       Password Baru
                     </label>
@@ -324,6 +352,20 @@ export default function SettingsPage() {
                     onChange={(e) => setPequrbanName(e.target.value)}
                     required
                     className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
+                    Nomor HP
+                  </label>
+                  <input
+                    type="tel"
+                    id="phoneNumber"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9+]/g, ""))}
+                    required
+                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                    placeholder="08xxxxxxxxxx"
                   />
                 </div>
                 <button
