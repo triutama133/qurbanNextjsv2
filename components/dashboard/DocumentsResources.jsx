@@ -3,7 +3,7 @@ import { ListSkeleton } from "./LoadingSkeletons"
 export default function DocumentsResources({ documents, loadingDocuments }) {
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg">
-      <h2 className="text-xl font-bold mb-4 text-gray-800">Dokumen & Sumber Daya</h2>
+      <h2 className="text-xl font-bold mb-4 text-gray-800">Dokumen & Link</h2>
       {loadingDocuments ? (
         <ListSkeleton />
       ) : (

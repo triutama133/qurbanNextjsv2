@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useCallback, useRef, Suspense } from "react"
+import { useEffect, useCallback, useRef, Suspense, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-// import supabase from "@/lib/supabase" // Not needed anymore
 import { formatRupiah, getMonthDifference } from "@/lib/utils"
 
 // Import custom hooks
@@ -21,6 +20,93 @@ import SavingHistory from "@/components/dashboard/SavingHistory"
 import TransferHistory from "@/components/dashboard/TransferHistory"
 import HelpDeskSection from "@/components/dashboard/HelpDeskSection"
 
+// Komponen tab menu mobile: Capaian & Transaksi (default), Milestone, Berita & Info, Dokumen & Link
+function MobileDashboardTabs({
+  profile, loadingProfile, appConfig, personalTotalRecorded, personalUsed, personalTransferred, loadingPersonal, formatRupiah, getMonthDifference,
+  transactionProps,
+  milestones, loadingMilestones,
+  news, loadingNews, newsPage, setNewsPage, totalNewsPages,
+  documents, loadingDocuments
+}) {
+  const [activeTab, setActiveTab] = useState("progress")
+  return (
+    <div className="block lg:hidden">
+      <div className="flex mb-4 border-b border-gray-200">
+        <button
+          className={`flex-1 py-2 text-sm font-medium focus:outline-none ${activeTab === "progress" ? "border-b-2 border-green-600 text-green-700" : "text-gray-500"}`}
+          onClick={() => setActiveTab("progress")}
+        >
+          Capaian & Transaksi
+        </button>
+        <button
+          className={`flex-1 py-2 text-sm font-medium focus:outline-none ${activeTab === "milestone" ? "border-b-2 border-green-600 text-green-700" : "text-gray-500"}`}
+          onClick={() => setActiveTab("milestone")}
+        >
+          Milestone
+        </button>
+        <button
+          className={`flex-1 py-2 text-sm font-medium focus:outline-none ${activeTab === "news" ? "border-b-2 border-green-600 text-green-700" : "text-gray-500"}`}
+          onClick={() => setActiveTab("news")}
+        >
+          Berita & Info
+        </button>
+        <button
+          className={`flex-1 py-2 text-sm font-medium focus:outline-none ${activeTab === "docs" ? "border-b-2 border-green-600 text-green-700" : "text-gray-500"}`}
+          onClick={() => setActiveTab("docs")}
+        >
+          Dokumen & Link
+        </button>
+      </div>
+      <div>
+        {activeTab === "progress" && (
+          <>
+            <PersonalProgress
+              profile={profile}
+              globalConfig={appConfig}
+              personalTotalRecorded={personalTotalRecorded}
+              personalUsed={personalUsed}
+              personalTransferred={transactionProps.personalTransferred}
+              loadingPersonal={loadingPersonal}
+              formatRupiah={formatRupiah}
+              getMonthDifference={getMonthDifference}
+            />
+            <TransactionForms {...transactionProps} />
+            <SavingHistory
+              personalSavingHistory={transactionProps.personalSavingHistory}
+              loadingPersonal={loadingPersonal}
+              formatRupiah={formatRupiah}
+              showConfirmModal={transactionProps.showConfirmModal}
+              handleEditTransaction={transactionProps.handleEditTransaction}
+              handleDeleteTransaction={transactionProps.handleDeleteSaving}
+            />
+            <TransferHistory
+              profile={profile}
+              personalTransferConfirmations={transactionProps.personalTransferConfirmations}
+              loadingPersonal={loadingPersonal}
+              formatRupiah={formatRupiah}
+            />
+          </>
+        )}
+        {activeTab === "milestone" && (
+          <MilestoneProgram milestones={milestones} loadingMilestones={loadingMilestones} />
+        )}
+        {activeTab === "news" && (
+          <NewsSection
+            news={news}
+            loadingNews={loadingNews}
+            newsPage={newsPage}
+            setNewsPage={setNewsPage}
+            totalNewsPages={totalNewsPages}
+          />
+        )}
+        {activeTab === "docs" && (
+          <DocumentsResources documents={documents} loadingDocuments={loadingDocuments} />
+        )}
+      </div>
+    </div>
+  )
+}
+
 // Komponen untuk menangani useSearchParams dengan Suspense
 function DashboardContent() {
   const router = useRouter()
@@ -30,93 +116,36 @@ function DashboardContent() {
   // Custom hooks
   const dashboardData = useDashboardData()
   const {
-    user,
-    setUser,
-    profile,
-    setProfile,
-    appConfig,
-    personalTotalRecorded,
-    setPersonalTotalRecorded,
-    personalUsed,
-    setPersonalUsed,
-    personalTransferred,
-    personalSavingHistory,
-    setPersonalSavingHistory,
-    personalTransferConfirmations,
-    setPersonalTransferConfirmations,
-    userHelpDeskTickets,
-    setUserHelpDeskTickets,
-    news,
-    milestones,
-    documents,
-    newsPage,
-    setNewsPage,
-    newsTotal,
-    NEWS_PER_PAGE,
-    loadingInitial,
-    setLoadingInitial,
-    loadingProfile,
-    loadingAppConfig,
-    loadingPersonal,
-    loadingNews,
-    loadingMilestones,
-    loadingHelpDeskTickets,
-    loadingDocuments,
-    error,
-    setError,
-    fetchUserAndInit,
-    fetchProfile,
-    fetchAppConfigSection,
-    fetchPersonalSectionData,
-    fetchNewsSection,
-    fetchMilestonesSection,
-    fetchHelpDeskTicketsSection,
-    fetchResourcesSection,
-    setNews,
-    setMilestones,
-    setDocuments,
+    user, setUser, profile, setProfile, appConfig,
+    personalTotalRecorded, setPersonalTotalRecorded, personalUsed, setPersonalUsed, personalTransferred,
+    personalSavingHistory, setPersonalSavingHistory, personalTransferConfirmations, setPersonalTransferConfirmations,
+    userHelpDeskTickets, setUserHelpDeskTickets, news, milestones, documents, newsPage, setNewsPage, newsTotal,
+    NEWS_PER_PAGE, loadingInitial, setLoadingInitial, loadingProfile, loadingAppConfig, loadingPersonal,
+    loadingNews, loadingMilestones, loadingHelpDeskTickets, loadingDocuments, error, setError,
+    fetchUserAndInit, fetchProfile, fetchAppConfigSection, fetchPersonalSectionData,
+    fetchNewsSection, fetchMilestonesSection, fetchHelpDeskTicketsSection, fetchResourcesSection,
+    setNews, setMilestones, setDocuments,
   } = dashboardData
 
   const dashboardActions = useDashboardActions({
-    user,
-    profile,
-    appConfig,
-    personalTotalRecorded,
-    personalUsed,
-    setPersonalSavingHistory,
-    setPersonalTotalRecorded,
-    setPersonalUsed,
-    setPersonalTransferConfirmations,
-    setUserHelpDeskTickets,
-    setProfile,
-    formatRupiah,
+    user, profile, appConfig, personalTotalRecorded, personalUsed,
+    setPersonalSavingHistory, setPersonalTotalRecorded, setPersonalUsed, setPersonalTransferConfirmations,
+    setUserHelpDeskTickets, setProfile, formatRupiah,
   })
 
   const {
-    addSavingLoading,
-    useSavingLoading,
-    confirmTransferLoading,
-    helpDeskFormLoading,
-    handleAddSaving,
-    handleUseSaving,
-    handleInitialDeposit,
-    handleConfirmTransfer,
-    handleHelpDeskSubmit,
-    showConfirmModal,
-    handleEditTransaction,
-    handleDeleteSaving,
-    handleDeleteTransferConfirmation,
+    addSavingLoading, useSavingLoading, confirmTransferLoading, helpDeskFormLoading,
+    handleAddSaving, handleUseSaving, handleInitialDeposit, handleConfirmTransfer, handleHelpDeskSubmit,
+    showConfirmModal, handleEditTransaction, handleDeleteSaving, handleDeleteTransferConfirmation,
   } = dashboardActions
 
   // --- Effects ---
-  // Agar fetchUserAndInit hanya dipanggil sekali saat mount
   const hasInit = useRef(false)
   useEffect(() => {
     if (!hasInit.current) {
       fetchUserAndInit(router)
       hasInit.current = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchUserAndInit])
 
   useEffect(() => {
@@ -128,10 +157,8 @@ function DashboardContent() {
     }
   }, [user, profile, appConfig, fetchProfile, fetchAppConfigSection])
 
-  // --- Dashboard Data Caching ---
   useEffect(() => {
     if (user && profile && appConfig) {
-      // Cek cache sessionStorage
       const cacheKey = `dashboard-data-${user.id}`
       const cache = sessionStorage.getItem(cacheKey)
       if (cache) {
@@ -146,7 +173,6 @@ function DashboardContent() {
             parsed.personalTransferConfirmations &&
             parsed.userHelpDeskTickets
           ) {
-            // Set state dari cache (hanya jika belum ada data)
             if (!news.length) setNews(parsed.news)
             if (!milestones.length) setMilestones(parsed.milestones)
             if (!documents.length) setDocuments(parsed.documents)
@@ -159,15 +185,13 @@ function DashboardContent() {
           }
         } catch {}
       }
-      // Jika tidak ada cache, fetch data seperti biasa
       Promise.allSettled([
         fetchPersonalSectionData(user.id, profile, appConfig),
         fetchNewsSection(newsPage),
         fetchMilestonesSection(),
         fetchHelpDeskTicketsSection(user.id),
         fetchResourcesSection(user.id),
-      ]).then((results) => {
-        // Simpan hasil ke cache
+      ]).then(() => {
         const cacheData = {
           news,
           milestones,
@@ -180,11 +204,8 @@ function DashboardContent() {
         setLoadingInitial(false)
       })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, profile, appConfig, newsPage])
 
-
-  // Cek session custom: jika user tidak ada di localStorage, redirect ke login
   useEffect(() => {
     if (typeof window !== "undefined") {
       const userStr = localStorage.getItem("qurban_user")
@@ -207,7 +228,6 @@ function DashboardContent() {
 
   const handleRefreshDashboard = useCallback(() => {
     if (user && appConfig) {
-      // Selalu fetch profile juga saat refresh
       fetchProfile(user.id)
       Promise.allSettled([
         fetchPersonalSectionData(user.id, profile, appConfig),
@@ -216,22 +236,14 @@ function DashboardContent() {
         fetchHelpDeskTicketsSection(user.id),
         fetchResourcesSection(user.id),
       ]).then(() => {
-        // Hapus cache agar data baru di-fetch ulang
         const cacheKey = `dashboard-data-${user.id}`
         sessionStorage.removeItem(cacheKey)
       })
     }
   }, [
-    user,
-    profile,
-    appConfig,
-    newsPage,
-    fetchProfile,
-    fetchPersonalSectionData,
-    fetchNewsSection,
-    fetchMilestonesSection,
-    fetchHelpDeskTicketsSection,
-    fetchResourcesSection,
+    user, profile, appConfig, newsPage,
+    fetchProfile, fetchPersonalSectionData, fetchNewsSection,
+    fetchMilestonesSection, fetchHelpDeskTicketsSection, fetchResourcesSection,
   ])
 
   // --- Render Logic ---
@@ -278,34 +290,71 @@ function DashboardContent() {
             />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Kolom Kiri (2/3 lebar di layar besar) */}
-              {/* Jika setoran awal belum approved, hanya tampilkan profil dan card setoran awal */}
               {profile && profile.IsInitialDepositMade && profile.InitialDepositStatus === "Approved" ? (
                 <>
                   <div className="lg:col-span-2 space-y-6">
                     <ProfilePequrban profile={profile} loadingProfile={loadingProfile} />
-                    <PersonalProgress
+                    {/* Mobile: Tab menu below profile, default tab = capaian & transaksi */}
+                    <MobileDashboardTabs
                       profile={profile}
-                      globalConfig={appConfig}
+                      loadingProfile={loadingProfile}
+                      appConfig={appConfig}
                       personalTotalRecorded={personalTotalRecorded}
                       personalUsed={personalUsed}
                       personalTransferred={personalTransferred}
                       loadingPersonal={loadingPersonal}
                       formatRupiah={formatRupiah}
                       getMonthDifference={getMonthDifference}
-                    />
-                    <MilestoneProgram milestones={milestones} loadingMilestones={loadingMilestones} />
-                    <NewsSection
+                      transactionProps={{
+                        profile,
+                        appConfig,
+                        user,
+                        personalTotalRecorded,
+                        personalUsed,
+                        personalSavingHistory,
+                        personalTransferConfirmations,
+                        addSavingLoading,
+                        useSavingLoading,
+                        confirmTransferLoading,
+                        handleAddSaving,
+                        handleUseSaving,
+                        handleInitialDeposit,
+                        handleConfirmTransfer,
+                        handleDeleteSaving,
+                        handleDeleteTransferConfirmation,
+                        formatRupiah,
+                        showConfirmModal,
+                        handleEditTransaction,
+                        handleDeleteSaving,
+                        personalTransferred,
+                        // for SavingHistory/TransferHistory
+                        personalSavingHistory,
+                        personalTransferConfirmations,
+                      }}
+                      milestones={milestones}
+                      loadingMilestones={loadingMilestones}
                       news={news}
                       loadingNews={loadingNews}
                       newsPage={newsPage}
                       setNewsPage={setNewsPage}
                       totalNewsPages={totalNewsPages}
+                      documents={documents}
+                      loadingDocuments={loadingDocuments}
                     />
-                    <DocumentsResources documents={documents} loadingDocuments={loadingDocuments} />
+                    {/* Desktop: as before (tidak dobel) */}
+                    <div className="hidden lg:block space-y-6">
+                      <MilestoneProgram milestones={milestones} loadingMilestones={loadingMilestones} />
+                      <NewsSection
+                        news={news}
+                        loadingNews={loadingNews}
+                        newsPage={newsPage}
+                        setNewsPage={setNewsPage}
+                        totalNewsPages={totalNewsPages}
+                      />
+                      <DocumentsResources documents={documents} loadingDocuments={loadingDocuments} />
+                    </div>
                   </div>
-                  {/* Kolom Kanan */}
-                  <div className="lg:col-span-1 space-y-6">
+                  <div className="hidden lg:block lg:col-span-1 space-y-6">
                     <TransactionForms
                       profile={profile}
                       appConfig={appConfig}
