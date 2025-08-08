@@ -46,9 +46,23 @@ export async function POST(request) {
     // Ambil userId dan transactionId dari frontend untuk membuat path file yang terorganisir
     const { name, mimeType, data, userId, transactionId } = formData
 
+
     if (!name || !mimeType || !data || !userId || !transactionId) {
       return NextResponse.json(
         { error: "Data file tidak lengkap (nama, mimeType, data, userId, atau transactionId hilang)." },
+        { status: 400 },
+      )
+    }
+
+    // Validasi hanya izinkan gambar dan PDF
+    const allowedMimeTypes = [
+      "image/jpeg", "image/png", "image/webp", "image/jpg", "application/pdf"
+    ];
+    const allowedExtensions = ["jpg", "jpeg", "png", "webp", "pdf"];
+    const ext = name.split(".").pop()?.toLowerCase();
+    if (!allowedMimeTypes.includes(mimeType) || !allowedExtensions.includes(ext)) {
+      return NextResponse.json(
+        { error: "Hanya file gambar (jpg, jpeg, png, webp) dan PDF yang diperbolehkan." },
         { status: 400 },
       )
     }
@@ -65,18 +79,16 @@ export async function POST(request) {
 
     const file = bucket.file(fileNameInGCS)
 
-    await file.save(fileBuffer, {
-      metadata: { contentType: mimeType },
-      // public: true // HAPUS baris ini!
-    })
 
-    // Mendapatkan URL publik dari file yang diunggah
+    await file.save(fileBuffer, { metadata: { contentType: mimeType } });
+
+    // Public URL Google Cloud Storage
     const publicUrl = `https://storage.googleapis.com/${GCS_BUCKET_NAME}/${fileNameInGCS}`
 
     return NextResponse.json(
       {
         success: true,
-        fileUrl: publicUrl,
+        fileUrl: publicUrl, // public URL
         fileName: fileNameInGCS, // Nama file lengkap di GCS
       },
       { status: 200 },

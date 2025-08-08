@@ -17,6 +17,7 @@ export function useDashboardActions({
   setUserHelpDeskTickets,
   setProfile,
   formatRupiah,
+  fetchPersonalSectionData, // Tambahkan prop ini
 }) {
   // Loading states for forms
   const [addSavingLoading, setAddSavingLoading] = useState(false)
@@ -254,11 +255,15 @@ export function useDashboardActions({
       const proofUrl = uploadResult.fileUrl
 
       const newTanggal = new Date().toISOString()
+      // Perbaikan: hitung total setoran awal sesuai jumlah pequrban
+      const jumlahPequrban = Number(profile?.JumlahPequrban) || 1;
+      const initialDepositPerPequrban = appConfig?.InitialDepositAmount || 300000;
+      const totalInitialDeposit = initialDepositPerPequrban * jumlahPequrban;
 
       const { data: savingData, error: savingError } = await supabase.from("tabungan").insert({
         TransaksiId: newTransactionId,
         UserId: getUserId(),
-        Jumlah: appConfig.InitialDepositAmount,
+        Jumlah: totalInitialDeposit,
         Metode: "Setoran Awal",
         Tanggal: newTanggal,
         Tipe: "Setoran",
@@ -289,7 +294,7 @@ export function useDashboardActions({
           {
             TransaksiId: newTransactionId,
             UserId: getUserId(),
-            Jumlah: appConfig.InitialDepositAmount,
+            Jumlah: totalInitialDeposit,
             Metode: "Setoran Awal",
             Tanggal: newTanggal,
             Tipe: "Setoran",
@@ -300,7 +305,7 @@ export function useDashboardActions({
           ...prev,
         ].sort((a, b) => new Date(b.Tanggal) - new Date(a.Tanggal)),
       )
-      setPersonalTotalRecorded((prev) => prev + appConfig.InitialDepositAmount)
+      setPersonalTotalRecorded((prev) => prev + totalInitialDeposit)
     } catch (err) {
       console.error("Error initial deposit:", err.message)
       initialMessageEl.textContent = "Gagal mencatat setoran awal: " + err.message
@@ -308,69 +313,64 @@ export function useDashboardActions({
     }
   }
 
-  const handleConfirmTransfer = async (e) => {
-    e.preventDefault()
-    setConfirmTransferLoading(true)
-    const transferAmountInput = e.target.elements.transferAmount
-    const transferAmount = Number.parseFloat(transferAmountInput.value.replace(/[^0-9]/g, ""))
-    const transferProofFile = e.target.elements.transferProofFile?.files[0]
-    const confirmMessageEl = document.getElementById("confirmMessage")
-
-    const targetAmount = profile?.TargetPribadi || 2650000
-
-    if (transferAmount !== targetAmount) {
-      confirmMessageEl.textContent = `Jumlah transfer harus tepat ${formatRupiah(targetAmount)}.`
-      confirmMessageEl.className = "text-sm mt-3 text-red-600"
-      setConfirmTransferLoading(false)
-      return
-    }
-
-    if (personalTotalRecorded < targetAmount) {
-      confirmMessageEl.textContent = `Dana tercatat belum mencapai target transfer ${formatRupiah(targetAmount)}.`
-      confirmMessageEl.className = "text-sm mt-3 text-red-600"
-      setConfirmTransferLoading(false)
-      return
-    }
-
+  // ----------- PERUBAHAN PENTING DISINI -----------
+  // Refactored: handleConfirmTransfer pakai callback, tanpa akses DOM
+  const handleConfirmTransfer = async (e, { onError, onSuccess } = {}) => {
+    e.preventDefault();
+    setConfirmTransferLoading(true);
     try {
-      confirmMessageEl.textContent = "Mengunggah bukti transfer..."
-      confirmMessageEl.className = "text-sm mt-3 text-gray-600"
+      const transferAmountInput = e.target.elements.transferAmount;
+      const transferAmount = Number.parseFloat(transferAmountInput.value.replace(/[^0-9]/g, ""));
+      const transferProofFile = e.target.elements.transferProofFile?.files[0];
 
-      const newConfirmationId = `CONF-${Date.now()}`
+      // FLEXIBLE MINIMUM: target - initial deposit (total)
+      const jumlahPequrban = Number(profile?.JumlahPequrban) || 1;
+      const targetAmount = profile?.TargetPribadi || 2650000;
+      const initialDeposit = (appConfig?.InitialDepositAmount || 300000) * jumlahPequrban;
+      const minimumTransfer = Math.max(0, targetAmount - initialDeposit);
+
+      // Validasi transfer minimal
+      if (transferAmount < minimumTransfer) {
+        if (onError) onError(`Jumlah transfer minimal ${formatRupiah(minimumTransfer)}`);
+        setConfirmTransferLoading(false);
+        return;
+      }
+
+      if (personalTotalRecorded < transferAmount) {
+        if (onError) onError(`Dana tercatat belum mencapai jumlah transfer ${formatRupiah(transferAmount)}`);
+        setConfirmTransferLoading(false);
+        return;
+      }
+
+      if (!transferProofFile) {
+        if (onError) onError("Bukti transfer wajib diunggah.");
+        setConfirmTransferLoading(false);
+        return;
+      }
+
+      // Upload file
+      const newConfirmationId = `CONF-${Date.now()}`;
       const fileData = {
         name: transferProofFile.name,
         mimeType: transferProofFile.type,
         data: await readFileAsBase64(transferProofFile),
         userId: getUserId(),
         transactionId: newConfirmationId,
-      }
+      };
       const uploadResponse = await fetch("/api/upload-file", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(fileData),
-      })
-      const uploadResult = await uploadResponse.json()
+      });
+      const uploadResult = await uploadResponse.json();
       if (!uploadResponse.ok || uploadResult.error) {
-        throw new Error(uploadResult.error || "Gagal mengunggah bukti.")
+        throw new Error(uploadResult.error || "Gagal mengunggah bukti.");
       }
-      const proofUrl = uploadResult.fileUrl
+      const proofUrl = uploadResult.fileUrl;
 
-      const newTimestamp = new Date().toISOString()
+      const newTimestamp = new Date().toISOString();
 
-      const { data, error } = await supabase.from("transfer_confirmations").insert({
-        ConfirmationId: newConfirmationId,
-        UserId: getUserId(),
-        Amount: transferAmount,
-        ProofLink: proofUrl,
-        Timestamp: newTimestamp,
-        Status: "Pending",
-        Notes: "Konfirmasi transfer cicilan pribadi",
-      })
-
-      if (error) {
-        throw error
-      }
-
+      // Update state SEBELUM reset form agar UI langsung berubah
       setPersonalTransferConfirmations((prev) =>
         [
           {
@@ -384,19 +384,32 @@ export function useDashboardActions({
           },
           ...prev,
         ].sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp)),
-      )
+      );
 
-      confirmMessageEl.textContent = "Konfirmasi transfer berhasil dikirim. Menunggu verifikasi admin."
-      confirmMessageEl.className = "text-sm mt-3 text-green-600"
-      e.target.reset()
+      // Insert ke supabase
+      const { data, error } = await supabase.from("transfer_confirmations").insert({
+        ConfirmationId: newConfirmationId,
+        UserId: getUserId(),
+        Amount: transferAmount,
+        ProofLink: proofUrl,
+        Timestamp: newTimestamp,
+        Status: "Pending",
+        Notes: "Konfirmasi transfer cicilan pribadi",
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (onSuccess) onSuccess();
+      e.target.reset();
     } catch (err) {
-      console.error("Error confirming transfer:", err.message)
-      confirmMessageEl.textContent = "Gagal mengirim konfirmasi transfer: " + err.message
-      confirmMessageEl.className = "text-sm mt-3 text-red-600"
+      console.error("Error confirming transfer:", err.message);
+      if (onError) onError("Gagal mengirim konfirmasi transfer: " + err.message);
     } finally {
-      setConfirmTransferLoading(false)
+      setConfirmTransferLoading(false);
     }
-  }
+  };
 
   const handleHelpDeskSubmit = async (e) => {
     e.preventDefault()

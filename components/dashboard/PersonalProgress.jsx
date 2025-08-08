@@ -19,6 +19,19 @@ export default function PersonalProgress({
     )
   }
 
+
+  // Perhitungan transferred: hanya Setoran Awal Approved dan Pelunasan Approved
+  let totalTransferred = 0;
+  // Ambil data transfer dari profile.transferConfirmations jika ada
+  if (profile && Array.isArray(profile.transferConfirmations)) {
+    totalTransferred = profile.transferConfirmations
+      .filter(item => item.Status === "Approved")
+      .reduce((sum, item) => sum + (item.Amount || 0), 0);
+  } else if (typeof personalTransferred === 'number') {
+    // fallback lama
+    totalTransferred = personalTransferred;
+  }
+
   // Rekomendasi Tabung Per Bulan
   const targetDateGlobal = globalConfig?.TanggalTargetQurban ? new Date(globalConfig.TanggalTargetQurban) : null
   const today = new Date()
@@ -82,7 +95,7 @@ export default function PersonalProgress({
           </div>
           <div className="bg-blue-50 p-4 rounded-lg text-center">
             <p className="text-sm text-gray-500">Ditransfer ke Panitia Qurban</p>
-            <p className="text-2xl font-bold text-blue-600">{formatRupiah(personalTransferred)}</p>
+            <p className="text-2xl font-bold text-blue-600">{formatRupiah(totalTransferred)}</p>
           </div>
           <div className="bg-gray-50 p-4 rounded-lg text-center">
             <p className="text-sm text-gray-500">

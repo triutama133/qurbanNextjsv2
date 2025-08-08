@@ -10,6 +10,7 @@ import { useDashboardActions } from "@/hooks/useDashboardActions"
 
 // Import komponen terpisah
 import DashboardHeader from "@/components/dashboard/DashboardHeader"
+import NotificationBell from "@/components/dashboard/NotificationBell"
 import ProfilePequrban from "@/components/dashboard/ProfilePequrban"
 import PersonalProgress from "@/components/dashboard/PersonalProgress"
 import MilestoneProgram from "@/components/dashboard/MilestoneProgram"
@@ -22,11 +23,13 @@ import HelpDeskSection from "@/components/dashboard/HelpDeskSection"
 
 // Komponen tab menu mobile: Capaian & Transaksi (default), Milestone, Berita & Info, Dokumen & Link
 function MobileDashboardTabs({
+  user, readNewsIds, setReadNewsIds,
   profile, loadingProfile, appConfig, personalTotalRecorded, personalUsed, personalTransferred, loadingPersonal, formatRupiah, getMonthDifference,
   transactionProps,
   milestones, loadingMilestones,
   news, loadingNews, newsPage, setNewsPage, totalNewsPages,
-  documents, loadingDocuments
+  documents, loadingDocuments,
+  openNewsModal
 }) {
   const [activeTab, setActiveTab] = useState("progress")
   return (
@@ -81,7 +84,7 @@ function MobileDashboardTabs({
             />
             <TransferHistory
               profile={profile}
-              personalTransferConfirmations={transactionProps.personalTransferConfirmations}
+              allPersonalTransferConfirmations={transactionProps.allPersonalTransferConfirmations}
               loadingPersonal={loadingPersonal}
               formatRupiah={formatRupiah}
             />
@@ -92,11 +95,9 @@ function MobileDashboardTabs({
         )}
         {activeTab === "news" && (
           <NewsSection
-            news={news}
-            loadingNews={loadingNews}
-            newsPage={newsPage}
-            setNewsPage={setNewsPage}
-            totalNewsPages={totalNewsPages}
+            userId={user?.id}
+            readNewsIds={readNewsIds}
+            setReadNewsIds={setReadNewsIds}
           />
         )}
         {activeTab === "docs" && (
@@ -109,6 +110,20 @@ function MobileDashboardTabs({
 
 // Komponen untuk menangani useSearchParams dengan Suspense
 function DashboardContent() {
+  // Fetch all news for notification bell (tanpa paging)
+  const [allNews, setAllNews] = useState([])
+  useEffect(() => {
+    async function fetchAllNews() {
+      try {
+        const res = await fetch('/api/get-news?page=1&all=1')
+        if (res.ok) {
+          const data = await res.json()
+          setAllNews(data.newsData || data.news || [])
+        }
+      } catch {}
+    }
+    fetchAllNews()
+  }, [])
   const router = useRouter()
   const searchParams = useSearchParams()
   const currentTab = searchParams.get("tab") || "main"
@@ -119,6 +134,7 @@ function DashboardContent() {
     user, setUser, profile, setProfile, appConfig,
     personalTotalRecorded, setPersonalTotalRecorded, personalUsed, setPersonalUsed, personalTransferred,
     personalSavingHistory, setPersonalSavingHistory, personalTransferConfirmations, setPersonalTransferConfirmations,
+    allPersonalTransferConfirmations, // <-- tambahkan ini agar tidak ReferenceError
     userHelpDeskTickets, setUserHelpDeskTickets, news, milestones, documents, newsPage, setNewsPage, newsTotal,
     NEWS_PER_PAGE, loadingInitial, setLoadingInitial, loadingProfile, loadingAppConfig, loadingPersonal,
     loadingNews, loadingMilestones, loadingHelpDeskTickets, loadingDocuments, error, setError,
@@ -131,6 +147,7 @@ function DashboardContent() {
     user, profile, appConfig, personalTotalRecorded, personalUsed,
     setPersonalSavingHistory, setPersonalTotalRecorded, setPersonalUsed, setPersonalTransferConfirmations,
     setUserHelpDeskTickets, setProfile, formatRupiah,
+    fetchPersonalSectionData, // Pastikan diteruskan ke hook actions
   })
 
   const {
@@ -139,10 +156,115 @@ function DashboardContent() {
     showConfirmModal, handleEditTransaction, handleDeleteSaving, handleDeleteTransferConfirmation,
   } = dashboardActions
 
-  // --- Effects ---
+  // --- Notification State (like original NewsSection) ---
+  // NewsSection now manages modal and paging. Only notification state here.
+  // (already declared above, do not redeclare)
+  const [readNewsIds, setReadNewsIds] = useState([])
+
+  // Load read news from backend (manual userId)
+  // Gunakan ref agar state readNewsIds tetap up-to-date di event handler
+  const readNewsIdsRef = useRef(readNewsIds)
+  useEffect(() => {
+    readNewsIdsRef.current = readNewsIds
+  }, [readNewsIds])
+
+  useEffect(() => {
+    async function fetchReadNews() {
+      let userId = null
+      // Try to get userId from user object (from dashboardData), fallback to localStorage
+      if (user && user.id) {
+        userId = user.id
+      } else if (typeof window !== 'undefined') {
+        try {
+          const userStr = localStorage.getItem('qurban_user')
+          if (userStr) {
+            const parsed = JSON.parse(userStr)
+            userId = parsed.id
+          }
+        } catch {}
+      }
+      if (!userId) return
+      try {
+        const res = await fetch("/api/read-news", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, action: "get" })
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setReadNewsIds(data.readNewsIds || [])
+        }
+      } catch {}
+    }
+    fetchReadNews()
+
+    // Listen for custom event from NewsSection/modal to update readNewsIds real-time
+    function handleNewsRead(e) {
+      const { newsId } = e.detail || {}
+      if (newsId && !readNewsIdsRef.current.includes(newsId)) {
+        setReadNewsIds((prev) => [...prev, newsId])
+      }
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('newsRead', handleNewsRead)
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('newsRead', handleNewsRead)
+      }
+    }
+  }, [user])
+
+  // Compute notifications
+  const notifications = (allNews && allNews.length > 0)
+    ? allNews.map((item) => ({
+        title: "Berita Baru",
+        message: item.Title,
+        time: new Date(item.DatePublished).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+        read: readNewsIds.includes(item.NewsletterId),
+        action: () => {
+          // Open modal in NewsSection via custom event
+          const event = new CustomEvent("openNewsModal", { detail: item })
+          window.dispatchEvent(event)
+        },
+        actionLabel: "Read More"
+      }))
+    : [];
+  // News modal and paging now handled in NewsSection
+  if (profile) {
+    if (!profile.IsInitialDepositMade) {
+      notifications.push({
+        title: "Setoran Awal",
+        message: "Anda belum melakukan setoran awal.",
+        read: false
+      })
+    } else if (profile.InitialDepositStatus === "Pending") {
+      notifications.push({
+        title: "Setoran Awal",
+        message: "Setoran awal Anda sedang menunggu verifikasi admin.",
+        read: false
+      })
+    } else if (profile.InitialDepositStatus === "Rejected") {
+      notifications.push({
+        title: "Setoran Awal Ditolak",
+        message: profile.InitialDepositAdminNotes ? `Alasan: ${profile.InitialDepositAdminNotes}` : "Setoran awal Anda ditolak oleh admin.",
+        read: false
+      })
+    } else if (profile.InitialDepositStatus === "Approved") {
+      notifications.push({
+        title: "Setoran Awal Disetujui",
+        message: "Setoran awal Anda telah diverifikasi admin.",
+        read: true
+      })
+    }
+  }
+
+  // News modal and paging now handled in NewsSection
   const hasInit = useRef(false)
   useEffect(() => {
     if (!hasInit.current) {
+  // Render NewsSection with only notification props
+  // <NewsSection /> should now handle its own paging, fetch, and modal
       fetchUserAndInit(router)
       hasInit.current = true
     }
@@ -273,11 +395,16 @@ function DashboardContent() {
 
   return (
     <div className="min-h-screen bg-gray-100">
+
       <DashboardHeader
         profile={profile}
         handleRefreshDashboard={handleRefreshDashboard}
         handleSignOut={handleSignOut}
-      />
+      >
+        <div className="ml-2">
+          <NotificationBell notifications={notifications} />
+        </div>
+      </DashboardHeader>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
@@ -296,6 +423,9 @@ function DashboardContent() {
                     <ProfilePequrban profile={profile} loadingProfile={loadingProfile} />
                     {/* Mobile: Tab menu below profile, default tab = capaian & transaksi */}
                     <MobileDashboardTabs
+                      user={user}
+                      readNewsIds={readNewsIds}
+                      setReadNewsIds={setReadNewsIds}
                       profile={profile}
                       loadingProfile={loadingProfile}
                       appConfig={appConfig}
@@ -313,6 +443,7 @@ function DashboardContent() {
                         personalUsed,
                         personalSavingHistory,
                         personalTransferConfirmations,
+                        allPersonalTransferConfirmations,
                         addSavingLoading,
                         useSavingLoading,
                         confirmTransferLoading,
@@ -340,17 +471,27 @@ function DashboardContent() {
                       totalNewsPages={totalNewsPages}
                       documents={documents}
                       loadingDocuments={loadingDocuments}
+                      // openNewsModal removed
                     />
                     {/* Desktop: as before (tidak dobel) */}
                     <div className="hidden lg:block space-y-6">
+                      <PersonalProgress
+                        profile={profile}
+                        globalConfig={appConfig}
+                        personalTotalRecorded={personalTotalRecorded}
+                        personalUsed={personalUsed}
+                        personalTransferred={personalTransferred}
+                        loadingPersonal={loadingPersonal}
+                        formatRupiah={formatRupiah}
+                        getMonthDifference={getMonthDifference}
+                      />
                       <MilestoneProgram milestones={milestones} loadingMilestones={loadingMilestones} />
                       <NewsSection
-                        news={news}
-                        loadingNews={loadingNews}
-                        newsPage={newsPage}
-                        setNewsPage={setNewsPage}
-                        totalNewsPages={totalNewsPages}
+                        userId={user?.id}
+                        readNewsIds={readNewsIds}
+                        setReadNewsIds={setReadNewsIds}
                       />
+      {/* Modal Berita Lengkap */}
                       <DocumentsResources documents={documents} loadingDocuments={loadingDocuments} />
                     </div>
                   </div>
@@ -384,7 +525,7 @@ function DashboardContent() {
                     />
                     <TransferHistory
                       profile={profile}
-                      personalTransferConfirmations={personalTransferConfirmations}
+                      allPersonalTransferConfirmations={allPersonalTransferConfirmations}
                       loadingPersonal={loadingPersonal}
                       formatRupiah={formatRupiah}
                     />
@@ -422,6 +563,7 @@ function DashboardContent() {
           )}
         </div>
       </main>
+    {/* Modal Berita Lengkap: render di luar blok desktop agar muncul di mobile & desktop, responsif */}
     </div>
   )
 }

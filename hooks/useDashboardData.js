@@ -11,7 +11,8 @@ export function useDashboardData() {
   const [personalUsed, setPersonalUsed] = useState(0)
   const [personalTransferred, setPersonalTransferred] = useState(0)
   const [personalSavingHistory, setPersonalSavingHistory] = useState([])
-  const [personalTransferConfirmations, setPersonalTransferConfirmations] = useState([])
+  const [personalTransferConfirmations, setPersonalTransferConfirmations] = useState([]) // hanya Approved
+  const [allPersonalTransferConfirmations, setAllPersonalTransferConfirmations] = useState([]) // semua status
   const [userHelpDeskTickets, setUserHelpDeskTickets] = useState([])
   const [news, setNews] = useState([])
   const [milestones, setMilestones] = useState(null)
@@ -147,10 +148,15 @@ export function useDashboardData() {
           };
         }
       }
-      let allTransfers = [...transferData];
+      // Simpan semua transfer (untuk riwayat)
+      let allTransfersFull = [...transferData];
       if (initialDepositTransfer) {
-        allTransfers = [initialDepositTransfer, ...allTransfers];
+        allTransfersFull = [initialDepositTransfer, ...allTransfersFull];
       }
+      setAllPersonalTransferConfirmations(allTransfersFull);
+
+      // Filter hanya transfer yang Approved (untuk progress)
+      let allTransfers = allTransfersFull.filter(item => item.Status === "Approved");
       let totalTransferredApproved = allTransfers.reduce((sum, item) => sum + (item.Amount || 0), 0);
       setPersonalTransferConfirmations(allTransfers);
       setPersonalTransferred(totalTransferredApproved);
@@ -242,8 +248,9 @@ export function useDashboardData() {
     personalTransferred,
     personalSavingHistory,
     setPersonalSavingHistory,
-    personalTransferConfirmations,
+    personalTransferConfirmations, // hanya Approved
     setPersonalTransferConfirmations,
+    allPersonalTransferConfirmations, // semua status untuk riwayat
     userHelpDeskTickets,
     setUserHelpDeskTickets,
     news,

@@ -9,9 +9,23 @@ export default function ProfilePequrban({ profile, loadingProfile }) {
       ) : (
         profile && (
           <div className="space-y-2 text-sm text-gray-700">
-            <p>
-              <strong>Nama Pequrban:</strong> {profile.NamaPequrban || profile.Nama}
-            </p>
+            {Array.isArray(profile.NamaPequrban) && profile.NamaPequrban.length > 1 ? (
+              <div>
+                <strong>Nama Pequrban:</strong>
+                <ol className="list-decimal ml-5 mt-1">
+                  {profile.NamaPequrban.map((n, i) => (
+                    <li key={i}>{n}</li>
+                  ))}
+                </ol>
+              </div>
+            ) : (
+              <p>
+                <strong>Nama Pequrban:</strong>{" "}
+                {Array.isArray(profile.NamaPequrban) && profile.NamaPequrban.length === 1
+                  ? profile.NamaPequrban[0]
+                  : profile.NamaPequrban || profile.Nama}
+              </p>
+            )}
             <p>
               <strong>Status Pequrban:</strong>{" "}
               {/* Status utama */}

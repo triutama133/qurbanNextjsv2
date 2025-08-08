@@ -7,14 +7,29 @@ const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process
 
 export async function POST(request) {
   try {
-    const { UserId, Nama, NamaPequrban, Email, MetodeTabungan, QurbanMethod, TargetPribadi, phone_number, Password } = await request.json()
+    const {
+      UserId,
+      Nama,
+      NamaPequrban,
+      JumlahPequrban,
+      Email,
+      MetodeTabungan,
+      QurbanMethod,
+      TargetPribadi,
+      phone_number,
+      Password
+    } = await request.json()
 
-    if (!UserId || !Nama || !NamaPequrban || !Email || !MetodeTabungan || !Password) {
-      return NextResponse.json({ error: "Data yang dibutuhkan tidak lengkap." }, { status: 400 })
+    // Validasi data wajib
+    if (!UserId || !Nama || !NamaPequrban || !Array.isArray(NamaPequrban) || NamaPequrban.length < 1 || !JumlahPequrban || !Email || !MetodeTabungan || !Password) {
+      return NextResponse.json({ error: "Data yang dibutuhkan tidak lengkap atau format salah." }, { status: 400 })
+    }
+    if (NamaPequrban.length !== Number(JumlahPequrban)) {
+      return NextResponse.json({ error: "Jumlah nama pequrban harus sesuai dengan jumlah pequrban." }, { status: 400 })
     }
 
     // Cek apakah email sudah terdaftar di public.users sebelum insert
-    const { data: existingUser, error: checkError } = await supabaseAdmin
+    const { data: existingUser } = await supabaseAdmin
       .from("users")
       .select("Email")
       .eq("Email", Email)
@@ -23,7 +38,6 @@ export async function POST(request) {
     if (existingUser) {
       return NextResponse.json({ error: "Email ini sudah terdaftar." }, { status: 409 })
     }
-
 
     // Hash password
     const bcrypt = require("bcryptjs")
@@ -42,21 +56,20 @@ export async function POST(request) {
     const verifyToken = generateToken();
     const verifyTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 jam
 
-    // Set target pribadi sesuai MetodeTabungan
-    const finalTarget = MetodeTabungan === "Qurban Sendiri" ? TargetPribadi : 2650000
-
+    // TargetPribadi sudah dihitung di frontend, cukup gunakan saja
     // Insert user dengan password hash dan token verifikasi
     const { data, error: insertError } = await supabaseAdmin.from("users").insert([
       {
         UserId,
         Nama,
         NamaPequrban,
+        JumlahPequrban,
         Email,
         Role: "User",
         MetodeTabungan,
-        QurbanMethod: QurbanMethod || "Tim",
+        QurbanMethod: QurbanMethod || (MetodeTabungan === "Qurban di Tim" ? "Tim" : "Sendiri"),
         StatusSetoran: "Belum Setor",
-        TargetPribadi: finalTarget,
+        TargetPribadi,
         TanggalDaftar: new Date().toISOString(),
         IsInitialDepositMade: false,
         InitialDepositStatus: "Pending",
@@ -73,7 +86,6 @@ export async function POST(request) {
       console.error("Error inserting user to public.users:", insertError.message)
       return NextResponse.json({ error: `Gagal menyimpan data user: ${insertError.message}` }, { status: 500 })
     }
-
 
     // Kirim email verifikasi via Resend
     const resend = new Resend(process.env.RESEND_API_KEY)

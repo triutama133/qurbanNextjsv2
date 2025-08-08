@@ -49,9 +49,11 @@ export default function SavingHistory({
 
   const handleSaveEdit = () => {
     if (editingTransaction && editAmount && editDate) {
+      // Remove all non-digit characters before sending
+      const cleanAmount = editAmount.replace(/[^0-9]/g, "");
       const updatedTransaction = {
         ...editingTransaction,
-        Jumlah: Number.parseInt(editAmount),
+        Jumlah: Number.parseInt(cleanAmount, 10),
         Tanggal: new Date(editDate).toISOString(),
       }
       handleEditTransaction(updatedTransaction)
@@ -153,10 +155,14 @@ export default function SavingHistory({
                         </div>
                       </div>
                       <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                          Batal
-                        </Button>
-                        <Button onClick={handleSaveEdit}>Simpan Perubahan</Button>
+                        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-2 w-full">
+                          <Button className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto" onClick={() => setIsEditDialogOpen(false)}>
+                            Batal
+                          </Button>
+                          <Button className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" onClick={handleSaveEdit}>
+                            Simpan Perubahan
+                          </Button>
+                        </div>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>

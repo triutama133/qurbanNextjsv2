@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation"
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState("")
-  const [pequrbanName, setPequrbanName] = useState("")
+  const [jumlahPequrban, setJumlahPequrban] = useState(1)
+  const [pequrbanNames, setPequrbanNames] = useState([""])
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -37,6 +38,21 @@ export default function RegisterPage() {
     setMessage("")
     setMessageType("")
 
+    // Validasi jumlah pequrban minimal 1
+    if (!jumlahPequrban || jumlahPequrban < 1) {
+      setMessage("Jumlah pequrban minimal 1.")
+      setMessageType("error")
+      setLoading(false)
+      return
+    }
+    // Validasi nama pequrban
+    if (pequrbanNames.length !== jumlahPequrban || pequrbanNames.some((n) => !n.trim())) {
+      setMessage("Semua nama pequrban harus diisi.")
+      setMessageType("error")
+      setLoading(false)
+      return
+    }
+
     if (password !== confirmPassword) {
       setMessage("Password dan konfirmasi password tidak cocok.")
       setMessageType("error")
@@ -45,17 +61,18 @@ export default function RegisterPage() {
     }
 
     // Validasi target custom jika qurban sendiri
-    let targetAmount = 2650000 // Default untuk Qurban di Tim
+    let targetPerPequrban = 2650000 // Default untuk Qurban di Tim
     if (metodeTabungan === "Qurban Sendiri") {
       const customAmount = Number.parseInt(customTarget.replace(/[^0-9]/g, ""))
       if (!customAmount || customAmount < 500000) {
-        setMessage("Target tabungan minimal Rp 500.000 untuk Qurban Sendiri.")
+        setMessage("Target tabungan minimal Rp 500.000 per pequrban untuk Qurban Sendiri.")
         setMessageType("error")
         setLoading(false)
         return
       }
-      targetAmount = customAmount
+      targetPerPequrban = customAmount
     }
+    const totalTarget = targetPerPequrban * jumlahPequrban
 
     // Generate userId (UUID v4)
     const userId = crypto.randomUUID ? crypto.randomUUID() : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
@@ -64,11 +81,12 @@ export default function RegisterPage() {
     console.log("Payload:", {
       UserId: userId,
       Nama: fullName,
-      NamaPequrban: pequrbanName,
+      NamaPequrban: pequrbanNames,
+      JumlahPequrban: jumlahPequrban,
       phone_number: phoneNumber,
       Email: email,
       MetodeTabungan: metodeTabungan,
-      TargetPribadi: targetAmount,
+      TargetPribadi: totalTarget,
     })
     const response = await fetch("/api/register-user", {
       method: "POST",
@@ -78,11 +96,12 @@ export default function RegisterPage() {
       body: JSON.stringify({
         UserId: userId,
         Nama: fullName,
-        NamaPequrban: pequrbanName,
+        NamaPequrban: pequrbanNames,
+        JumlahPequrban: jumlahPequrban,
         phone_number: phoneNumber,
         Email: email,
         MetodeTabungan: metodeTabungan,
-        TargetPribadi: targetAmount,
+        TargetPribadi: totalTarget,
         Password: password,
       }),
     })
@@ -136,21 +155,63 @@ export default function RegisterPage() {
                 onChange={(e) => setFullName(e.target.value)}
               />
             </div>
+            {/* Jumlah Pequrban */}
             <div>
-              <label htmlFor="pequrban-name" className="block text-sm font-medium text-gray-700 mb-1">
-                Nama Pequrban (Qurban atas nama)
+              <label htmlFor="jumlah-pequrban" className="block text-sm font-medium text-gray-700 mb-1">
+                Jumlah Pequrban
               </label>
               <input
-                id="pequrban-name"
-                name="pequrban-name"
-                type="text"
+                id="jumlah-pequrban"
+                name="jumlah-pequrban"
+                type="number"
+                min={1}
+                max={10}
                 required
                 className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Masukkan nama pequrban (contoh: Nama Ayah)"
-                value={pequrbanName}
-                onChange={(e) => setPequrbanName(e.target.value)}
+                value={jumlahPequrban === 0 ? "" : jumlahPequrban}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  if (raw === "") {
+                    setJumlahPequrban(0)
+                    setPequrbanNames([])
+                    return
+                  }
+                  let val = Number(raw)
+                  if (isNaN(val)) val = 0
+                  if (val > 10) val = 10
+                  setJumlahPequrban(val)
+                  setPequrbanNames((prev) => {
+                    const arr = [...prev]
+                    if (val > arr.length) {
+                      for (let i = arr.length; i < val; i++) arr.push("")
+                    } else if (val < arr.length) {
+                      arr.length = val
+                    }
+                    return arr
+                  })
+                }}
               />
             </div>
+            {/* Nama-nama Pequrban */}
+            {pequrbanNames.map((name, idx) => (
+              <div key={idx}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Nama Pequrban #{idx + 1}
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  placeholder={`Masukkan nama pequrban ke-${idx + 1}`}
+                  value={name}
+                  onChange={(e) => {
+                    const arr = [...pequrbanNames]
+                    arr[idx] = e.target.value
+                    setPequrbanNames(arr)
+                  }}
+                />
+              </div>
+            ))}
             <div>
               <label htmlFor="email-address" className="block text-sm font-medium text-gray-700 mb-1">
                 Alamat Email
@@ -197,7 +258,7 @@ export default function RegisterPage() {
                     onChange={(e) => setMetodeTabungan(e.target.value)}
                     className="mr-2"
                   />
-                  <span className="text-sm text-gray-700">Qurban di Tim (Target: {formatRupiah(2650000)})</span>
+                  <span className="text-sm text-gray-700">Qurban di Tim (Target: {formatRupiah(2650000)} x {jumlahPequrban} = {formatRupiah(2650000 * jumlahPequrban)})</span>
                 </label>
                 <label className="flex items-center">
                   <input
@@ -208,7 +269,7 @@ export default function RegisterPage() {
                     onChange={(e) => setMetodeTabungan(e.target.value)}
                     className="mr-2"
                   />
-                  <span className="text-sm text-gray-700">Qurban Sendiri (Target Custom)</span>
+                  <span className="text-sm text-gray-700">Qurban Sendiri (Target Custom x {jumlahPequrban})</span>
                 </label>
               </div>
             </div>
@@ -217,7 +278,7 @@ export default function RegisterPage() {
             {metodeTabungan === "Qurban Sendiri" && (
               <div>
                 <label htmlFor="custom-target" className="block text-sm font-medium text-gray-700 mb-1">
-                  Target Tabungan Custom
+                  Target Tabungan Custom (per pequrban)
                 </label>
                 <input
                   id="custom-target"
@@ -225,7 +286,7 @@ export default function RegisterPage() {
                   type="text"
                   required
                   className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                  placeholder="Masukkan target tabungan (contoh. Rp 2.500.000)"
+                  placeholder="Masukkan target tabungan per pequrban (contoh. Rp 2.500.000)"
                   value={customTarget}
                   onChange={(e) => {
                     const value = e.target.value.replace(/[^0-9]/g, "")
@@ -235,9 +296,9 @@ export default function RegisterPage() {
                 />
                 {customTarget && (
                   <p className="text-xs text-gray-500 mt-1">
-                    Rekomendasi tabungan per bulan:{" "}
-                    {formatRupiah(
-                      calculateMonthlyRecommendation(Number.parseInt(customTarget.replace(/[^0-9]/g, "")) || 0)
+                    Total target: {formatRupiah((Number.parseInt(customTarget.replace(/[^0-9]/g, "")) || 0) * jumlahPequrban)}<br />
+                    Rekomendasi tabungan per bulan: {formatRupiah(
+                      calculateMonthlyRecommendation((Number.parseInt(customTarget.replace(/[^0-9]/g, "")) || 0) * jumlahPequrban)
                     )}
                   </p>
                 )}

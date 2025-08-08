@@ -1,6 +1,6 @@
 "use client"
 
-export default function DashboardHeader({ profile, handleRefreshDashboard, handleSignOut }) {
+export default function DashboardHeader({ profile, handleRefreshDashboard, handleSignOut, children }) {
   return (
     <header className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
@@ -10,6 +10,7 @@ export default function DashboardHeader({ profile, handleRefreshDashboard, handl
             {profile && <p className="text-gray-600">Selamat datang, {profile.Nama}!</p>}
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 mt-2 sm:mt-0">
+            {children}
             <a
               href="/settings"
               className="inline-flex items-center justify-center border border-gray-300 bg-white text-sm font-medium text-gray-700 px-4 py-2 rounded-md shadow-sm hover:bg-green-50 hover:text-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
