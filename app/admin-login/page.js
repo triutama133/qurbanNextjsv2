@@ -94,16 +94,17 @@ export default function AdminLoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg border-t-8 border-indigo-600">
-        <div className="flex flex-col items-center gap-2">
-          <img src="/file.svg" alt="Sapi" className="w-16 h-16 mb-2" />
-          <h1 className="text-xl font-bold text-indigo-700 text-center">Tabungan Qurban Keluarga Peduli 1446H</h1>
-          <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">
-            Login Admin
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Masuk untuk mengakses dashboard administrator
-          </p>
-        </div>
+         <div className="flex flex-col items-center gap-2">
+           <img src="/logo.png" alt="Logo Qurban" className="h-28 w-auto mb-2" style={{maxWidth: 180}} />
+           <img src="/file.svg" alt="Sapi" className="w-16 h-16 mb-2" />
+           <h1 className="text-xl font-bold text-[#E53935] text-center">Tabungan Qurban Keluarga Peduli 1446H</h1>
+           <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">
+             Login Admin
+           </h2>
+           <p className="mt-2 text-center text-sm text-gray-600">
+             Masuk untuk mengakses dashboard administrator
+           </p>
+         </div>
         <form className="mt-8 space-y-6" onSubmit={handleAdminSignIn}>
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
@@ -151,13 +152,13 @@ export default function AdminLoginPage() {
           )}
 
           <div className="flex flex-col gap-2">
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              {loading ? 'Memproses...' : 'Login Admin'}
-            </button>
+             <button
+               type="submit"
+               disabled={loading}
+               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[#E53935] hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+             >
+               {loading ? 'Memproses...' : 'Login Admin'}
+             </button>
             <button
               type="button"
               className="w-full text-xs text-indigo-600 hover:underline mt-1"

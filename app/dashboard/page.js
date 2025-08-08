@@ -134,7 +134,7 @@ function DashboardContent() {
     user, setUser, profile, setProfile, appConfig,
     personalTotalRecorded, setPersonalTotalRecorded, personalUsed, setPersonalUsed, personalTransferred,
     personalSavingHistory, setPersonalSavingHistory, personalTransferConfirmations, setPersonalTransferConfirmations,
-    allPersonalTransferConfirmations, // <-- tambahkan ini agar tidak ReferenceError
+    allPersonalTransferConfirmations, setAllPersonalTransferConfirmations, // <-- tambahkan setter
     userHelpDeskTickets, setUserHelpDeskTickets, news, milestones, documents, newsPage, setNewsPage, newsTotal,
     NEWS_PER_PAGE, loadingInitial, setLoadingInitial, loadingProfile, loadingAppConfig, loadingPersonal,
     loadingNews, loadingMilestones, loadingHelpDeskTickets, loadingDocuments, error, setError,
@@ -215,47 +215,57 @@ function DashboardContent() {
     }
   }, [user])
 
-  // Compute notifications
-  const notifications = (allNews && allNews.length > 0)
-    ? allNews.map((item) => ({
-        title: "Berita Baru",
-        message: item.Title,
-        time: new Date(item.DatePublished).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
-        read: readNewsIds.includes(item.NewsletterId),
-        action: () => {
-          // Open modal in NewsSection via custom event
-          const event = new CustomEvent("openNewsModal", { detail: item })
-          window.dispatchEvent(event)
-        },
-        actionLabel: "Read More"
-      }))
-    : [];
-  // News modal and paging now handled in NewsSection
+  // Gabungkan notifikasi berita dan setoran/pelunasan dalam satu array
+  let notifications = [];
+  if (allNews && allNews.length > 0) {
+    notifications = allNews.map((item) => ({
+      title: "Berita Baru",
+      message: item.Title,
+      time: item.DatePublished,
+      read: readNewsIds.includes(item.NewsletterId),
+      action: () => {
+        // Open modal in NewsSection via custom event
+        const event = new CustomEvent("openNewsModal", { detail: item })
+        window.dispatchEvent(event)
+      },
+      actionLabel: "Read More",
+      type: "berita"
+    }));
+  }
+  // Tambahkan notifikasi setoran/pelunasan dengan type dan time
   if (profile) {
     if (!profile.IsInitialDepositMade) {
       notifications.push({
         title: "Setoran Awal",
         message: "Anda belum melakukan setoran awal.",
-        read: false
-      })
+        read: false,
+        type: "setoran",
+        time: profile.InitialDepositDate || new Date().toISOString()
+      });
     } else if (profile.InitialDepositStatus === "Pending") {
       notifications.push({
         title: "Setoran Awal",
         message: "Setoran awal Anda sedang menunggu verifikasi admin.",
-        read: false
-      })
+        read: false,
+        type: "setoran",
+        time: profile.InitialDepositDate || new Date().toISOString()
+      });
     } else if (profile.InitialDepositStatus === "Rejected") {
       notifications.push({
         title: "Setoran Awal Ditolak",
         message: profile.InitialDepositAdminNotes ? `Alasan: ${profile.InitialDepositAdminNotes}` : "Setoran awal Anda ditolak oleh admin.",
-        read: false
-      })
+        read: false,
+        type: "setoran",
+        time: profile.InitialDepositDate || new Date().toISOString()
+      });
     } else if (profile.InitialDepositStatus === "Approved") {
       notifications.push({
         title: "Setoran Awal Disetujui",
         message: "Setoran awal Anda telah diverifikasi admin.",
-        read: true
-      })
+        read: true,
+        type: "setoran",
+        time: profile.InitialDepositVerifiedAt || profile.InitialDepositDate || new Date().toISOString()
+      });
     }
   }
 
@@ -293,6 +303,7 @@ function DashboardContent() {
             parsed.documents &&
             parsed.personalSavingHistory &&
             parsed.personalTransferConfirmations &&
+            parsed.allPersonalTransferConfirmations &&
             parsed.userHelpDeskTickets
           ) {
             if (!news.length) setNews(parsed.news)
@@ -301,6 +312,8 @@ function DashboardContent() {
             if (!personalSavingHistory.length) setPersonalSavingHistory(parsed.personalSavingHistory)
             if (!personalTransferConfirmations.length)
               setPersonalTransferConfirmations(parsed.personalTransferConfirmations)
+            if (!allPersonalTransferConfirmations.length)
+              setAllPersonalTransferConfirmations(parsed.allPersonalTransferConfirmations)
             if (!userHelpDeskTickets.length) setUserHelpDeskTickets(parsed.userHelpDeskTickets)
             setLoadingInitial(false)
             return
@@ -320,6 +333,7 @@ function DashboardContent() {
           documents,
           personalSavingHistory,
           personalTransferConfirmations,
+          allPersonalTransferConfirmations,
           userHelpDeskTickets,
         }
         sessionStorage.setItem(cacheKey, JSON.stringify(cacheData))
@@ -369,25 +383,7 @@ function DashboardContent() {
   ])
 
   // --- Render Logic ---
-  if (loadingInitial || loadingAppConfig) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <svg
-          className="animate-spin h-12 w-12 text-green-600"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path
-            className="opacity-75"
-            fill="currentColor"
-            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-          ></path>
-        </svg>
-      </div>
-    )
-  }
+  // Tidak lagi pakai global spinner, loading per section
 
   if (error) return <div className="text-center mt-10 text-red-500">Error: {error}</div>
 
@@ -395,175 +391,166 @@ function DashboardContent() {
 
   return (
     <div className="min-h-screen bg-gray-100">
-
       <DashboardHeader
         profile={profile}
         handleRefreshDashboard={handleRefreshDashboard}
         handleSignOut={handleSignOut}
       >
-        <div className="ml-2">
-          <NotificationBell notifications={notifications} />
-        </div>
+        {profile && profile.IsInitialDepositMade && (
+          <div className="ml-2">
+            <NotificationBell notifications={notifications} />
+          </div>
+        )}
       </DashboardHeader>
-
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           {currentTab === "helpdesk" ? (
             <HelpDeskSection
               userHelpDeskTickets={userHelpDeskTickets}
-              loadingHelpDeskTickets={loadingHelpDeskTickets}
+              loadingHelpDeskTickets={loadingHelpDeskTickets || loadingInitial}
               helpDeskFormLoading={helpDeskFormLoading}
               handleHelpDeskSubmit={handleHelpDeskSubmit}
             />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {profile && profile.IsInitialDepositMade && profile.InitialDepositStatus === "Approved" ? (
-                <>
-                  <div className="lg:col-span-2 space-y-6">
-                    <ProfilePequrban profile={profile} loadingProfile={loadingProfile} />
-                    {/* Mobile: Tab menu below profile, default tab = capaian & transaksi */}
-                    <MobileDashboardTabs
-                      user={user}
-                      readNewsIds={readNewsIds}
-                      setReadNewsIds={setReadNewsIds}
-                      profile={profile}
-                      loadingProfile={loadingProfile}
-                      appConfig={appConfig}
-                      personalTotalRecorded={personalTotalRecorded}
-                      personalUsed={personalUsed}
-                      personalTransferred={personalTransferred}
-                      loadingPersonal={loadingPersonal}
-                      formatRupiah={formatRupiah}
-                      getMonthDifference={getMonthDifference}
-                      transactionProps={{
-                        profile,
-                        appConfig,
-                        user,
-                        personalTotalRecorded,
-                        personalUsed,
-                        personalSavingHistory,
-                        personalTransferConfirmations,
-                        allPersonalTransferConfirmations,
-                        addSavingLoading,
-                        useSavingLoading,
-                        confirmTransferLoading,
-                        handleAddSaving,
-                        handleUseSaving,
-                        handleInitialDeposit,
-                        handleConfirmTransfer,
-                        handleDeleteSaving,
-                        handleDeleteTransferConfirmation,
-                        formatRupiah,
-                        showConfirmModal,
-                        handleEditTransaction,
-                        handleDeleteSaving,
-                        personalTransferred,
-                        // for SavingHistory/TransferHistory
-                        personalSavingHistory,
-                        personalTransferConfirmations,
-                      }}
-                      milestones={milestones}
-                      loadingMilestones={loadingMilestones}
-                      news={news}
-                      loadingNews={loadingNews}
-                      newsPage={newsPage}
-                      setNewsPage={setNewsPage}
-                      totalNewsPages={totalNewsPages}
-                      documents={documents}
-                      loadingDocuments={loadingDocuments}
-                      // openNewsModal removed
-                    />
-                    {/* Desktop: as before (tidak dobel) */}
-                    <div className="hidden lg:block space-y-6">
-                      <PersonalProgress
-                        profile={profile}
-                        globalConfig={appConfig}
-                        personalTotalRecorded={personalTotalRecorded}
-                        personalUsed={personalUsed}
-                        personalTransferred={personalTransferred}
-                        loadingPersonal={loadingPersonal}
-                        formatRupiah={formatRupiah}
-                        getMonthDifference={getMonthDifference}
-                      />
-                      <MilestoneProgram milestones={milestones} loadingMilestones={loadingMilestones} />
-                      <NewsSection
-                        userId={user?.id}
-                        readNewsIds={readNewsIds}
-                        setReadNewsIds={setReadNewsIds}
-                      />
-      {/* Modal Berita Lengkap */}
-                      <DocumentsResources documents={documents} loadingDocuments={loadingDocuments} />
-                    </div>
-                  </div>
-                  <div className="hidden lg:block lg:col-span-1 space-y-6">
-                    <TransactionForms
-                      profile={profile}
-                      appConfig={appConfig}
-                      user={user}
-                      personalTotalRecorded={personalTotalRecorded}
-                      personalUsed={personalUsed}
-                      personalSavingHistory={personalSavingHistory}
-                      personalTransferConfirmations={personalTransferConfirmations}
-                      addSavingLoading={addSavingLoading}
-                      useSavingLoading={useSavingLoading}
-                      confirmTransferLoading={confirmTransferLoading}
-                      handleAddSaving={handleAddSaving}
-                      handleUseSaving={handleUseSaving}
-                      handleInitialDeposit={handleInitialDeposit}
-                      handleConfirmTransfer={handleConfirmTransfer}
-                      handleDeleteSaving={handleDeleteSaving}
-                      handleDeleteTransferConfirmation={handleDeleteTransferConfirmation}
-                      formatRupiah={formatRupiah}
-                    />
-                    <SavingHistory
-                      personalSavingHistory={personalSavingHistory}
-                      loadingPersonal={loadingPersonal}
-                      formatRupiah={formatRupiah}
-                      showConfirmModal={showConfirmModal}
-                      handleEditTransaction={handleEditTransaction}
-                      handleDeleteTransaction={handleDeleteSaving}
-                    />
-                    <TransferHistory
-                      profile={profile}
-                      allPersonalTransferConfirmations={allPersonalTransferConfirmations}
-                      loadingPersonal={loadingPersonal}
-                      formatRupiah={formatRupiah}
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="lg:col-span-3">
-                    <ProfilePequrban profile={profile} loadingProfile={loadingProfile} />
-                  </div>
-                  <div className="lg:col-span-3">
-                    <TransactionForms
-                      profile={profile}
-                      appConfig={appConfig}
-                      user={user}
-                      personalTotalRecorded={personalTotalRecorded}
-                      personalUsed={personalUsed}
-                      personalSavingHistory={personalSavingHistory}
-                      personalTransferConfirmations={personalTransferConfirmations}
-                      addSavingLoading={addSavingLoading}
-                      useSavingLoading={useSavingLoading}
-                      confirmTransferLoading={confirmTransferLoading}
-                      handleAddSaving={handleAddSaving}
-                      handleUseSaving={handleUseSaving}
-                      handleInitialDeposit={handleInitialDeposit}
-                      handleConfirmTransfer={handleConfirmTransfer}
-                      handleDeleteSaving={handleDeleteSaving}
-                      handleDeleteTransferConfirmation={handleDeleteTransferConfirmation}
-                      formatRupiah={formatRupiah}
-                    />
-                  </div>
-                </>
+              {/* Section: Profile & Progress */}
+              <div className={"lg:col-span-2 space-y-6"}>
+                <ProfilePequrban profile={profile} loadingProfile={loadingProfile || loadingInitial} />
+                {/* Mobile: Tab menu below profile, default tab = capaian & transaksi */}
+                <MobileDashboardTabs
+                  user={user}
+                  readNewsIds={readNewsIds}
+                  setReadNewsIds={setReadNewsIds}
+                  profile={profile}
+                  loadingProfile={loadingProfile || loadingInitial}
+                  appConfig={appConfig}
+                  personalTotalRecorded={personalTotalRecorded}
+                  personalUsed={personalUsed}
+                  personalTransferred={personalTransferred}
+                  loadingPersonal={loadingPersonal || loadingInitial}
+                  formatRupiah={formatRupiah}
+                  getMonthDifference={getMonthDifference}
+                  transactionProps={{
+                    profile,
+                    appConfig,
+                    user,
+                    personalTotalRecorded,
+                    personalUsed,
+                    personalSavingHistory,
+                    personalTransferConfirmations,
+                    allPersonalTransferConfirmations,
+                    addSavingLoading,
+                    useSavingLoading,
+                    confirmTransferLoading,
+                    handleAddSaving,
+                    handleUseSaving,
+                    handleInitialDeposit,
+                    handleConfirmTransfer,
+                    handleDeleteSaving,
+                    handleDeleteTransferConfirmation,
+                    formatRupiah,
+                    showConfirmModal,
+                    handleEditTransaction,
+                    personalTransferred,
+                  }}
+                  milestones={milestones}
+                  loadingMilestones={loadingMilestones || loadingInitial}
+                  news={news}
+                  loadingNews={loadingNews || loadingInitial}
+                  newsPage={newsPage}
+                  setNewsPage={setNewsPage}
+                  totalNewsPages={totalNewsPages}
+                  documents={documents}
+                  loadingDocuments={loadingDocuments || loadingInitial}
+                />
+                {/* Desktop: as before (tidak dobel) */}
+                <div className="hidden lg:block space-y-6">
+                  <PersonalProgress
+                    profile={profile}
+                    globalConfig={appConfig}
+                    personalTotalRecorded={personalTotalRecorded}
+                    personalUsed={personalUsed}
+                    personalTransferred={personalTransferred}
+                    loadingPersonal={loadingPersonal || loadingInitial}
+                    formatRupiah={formatRupiah}
+                    getMonthDifference={getMonthDifference}
+                  />
+                  <MilestoneProgram milestones={milestones} loadingMilestones={loadingMilestones || loadingInitial} />
+                  <NewsSection
+                    userId={user?.id}
+                    readNewsIds={readNewsIds}
+                    setReadNewsIds={setReadNewsIds}
+                    loadingNews={loadingNews || loadingInitial}
+                  />
+                  <DocumentsResources documents={documents} loadingDocuments={loadingDocuments || loadingInitial} />
+                </div>
+              </div>
+              {/* Section: Transaction & History (desktop only) */}
+              <div className="hidden lg:block lg:col-span-1 space-y-6">
+                <TransactionForms
+                  profile={profile}
+                  appConfig={appConfig}
+                  user={user}
+                  personalTotalRecorded={personalTotalRecorded}
+                  personalUsed={personalUsed}
+                  personalSavingHistory={personalSavingHistory}
+                  personalTransferConfirmations={personalTransferConfirmations}
+                  addSavingLoading={addSavingLoading}
+                  useSavingLoading={useSavingLoading}
+                  confirmTransferLoading={confirmTransferLoading}
+                  handleAddSaving={handleAddSaving}
+                  handleUseSaving={handleUseSaving}
+                  handleInitialDeposit={handleInitialDeposit}
+                  handleConfirmTransfer={handleConfirmTransfer}
+                  handleDeleteSaving={handleDeleteSaving}
+                  handleDeleteTransferConfirmation={handleDeleteTransferConfirmation}
+                  formatRupiah={formatRupiah}
+                  loadingPersonal={loadingPersonal || loadingInitial}
+                />
+                <SavingHistory
+                  personalSavingHistory={personalSavingHistory}
+                  loadingPersonal={loadingPersonal || loadingInitial}
+                  formatRupiah={formatRupiah}
+                  showConfirmModal={showConfirmModal}
+                  handleEditTransaction={handleEditTransaction}
+                  handleDeleteTransaction={handleDeleteSaving}
+                />
+                <TransferHistory
+                  profile={profile}
+                  allPersonalTransferConfirmations={allPersonalTransferConfirmations}
+                  loadingPersonal={loadingPersonal || loadingInitial}
+                  formatRupiah={formatRupiah}
+                />
+              </div>
+              {/* Section: Transaction (mobile/initial deposit not made) */}
+              {(!profile || !profile.IsInitialDepositMade || profile.InitialDepositStatus !== "Approved") && (
+                <div className="lg:col-span-3">
+                  <TransactionForms
+                    profile={profile}
+                    appConfig={appConfig}
+                    user={user}
+                    personalTotalRecorded={personalTotalRecorded}
+                    personalUsed={personalUsed}
+                    personalSavingHistory={personalSavingHistory}
+                    personalTransferConfirmations={personalTransferConfirmations}
+                    addSavingLoading={addSavingLoading}
+                    useSavingLoading={useSavingLoading}
+                    confirmTransferLoading={confirmTransferLoading}
+                    handleAddSaving={handleAddSaving}
+                    handleUseSaving={handleUseSaving}
+                    handleInitialDeposit={handleInitialDeposit}
+                    handleConfirmTransfer={handleConfirmTransfer}
+                    handleDeleteSaving={handleDeleteSaving}
+                    handleDeleteTransferConfirmation={handleDeleteTransferConfirmation}
+                    formatRupiah={formatRupiah}
+                    loadingPersonal={loadingPersonal || loadingInitial}
+                  />
+                </div>
               )}
             </div>
           )}
         </div>
       </main>
-    {/* Modal Berita Lengkap: render di luar blok desktop agar muncul di mobile & desktop, responsif */}
     </div>
   )
 }

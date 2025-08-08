@@ -4,9 +4,12 @@ export default function AdminHeader({ profile, handleRefreshAdminDashboard, hand
   return (
     <header className="bg-indigo-700 shadow-sm">
       <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
-          {profile && <p className="text-indigo-200">Selamat datang, {profile.Nama} (Admin)!</p>}
+        <div className="flex items-center gap-4">
+          <img src="/logo.png" alt="Logo Qurban" className="h-12 w-auto" style={{maxWidth: 80}} />
+          <div>
+            <h1 className="text-2xl font-bold text-white">Admin Dashboard</h1>
+            {profile && <p className="text-indigo-200">Selamat datang, {profile.Nama} (Admin)!</p>}
+          </div>
         </div>
         <div className="flex items-center space-x-4">
           <button

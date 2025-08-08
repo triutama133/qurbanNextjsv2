@@ -4,7 +4,12 @@ export default function DashboardHeader({ profile, handleRefreshDashboard, handl
   return (
     <header className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-        <h1 className="text-2xl font-bold text-green-800 text-center sm:text-left">Dashboard Tabungan Qurban Keluarga Peduli</h1>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 w-full">
+          <div className="flex justify-center sm:justify-start">
+            <img src="/logo.png" alt="Logo Qurban" className="h-28 w-auto" style={{maxWidth: 180}} />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#E53935] text-center sm:text-left w-full">Dashboard Tabungan Qurban Keluarga Peduli</h1>
+        </div>
         <div className="mt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div className="text-center sm:text-left">
             {profile && <p className="text-gray-600">Selamat datang, {profile.Nama}!</p>}

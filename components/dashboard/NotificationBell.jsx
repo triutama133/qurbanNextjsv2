@@ -85,23 +85,58 @@ export default function NotificationBell({ notifications = [] }) {
           {notifications.length === 0 ? (
             <div className="p-4 text-gray-500 text-sm">Tidak ada notifikasi baru.</div>
           ) : (
-            <ul className="divide-y divide-gray-100">
-              {notifications.map((notif, idx) => (
-                <li key={idx} className={`p-4 text-sm ${!notif.read ? "bg-gray-50" : ""}`}>
-                  <div className="font-semibold text-gray-800 mb-1">{notif.title}</div>
-                  <div className="text-gray-600 mb-1">{notif.message}</div>
-                  {notif.time && <div className="text-xs text-gray-400">{notif.time}</div>}
-                  {notif.action && (
-                    <button
-                      className="mt-2 text-xs text-indigo-600 hover:underline font-semibold"
-                      onClick={notif.action}
+            (() => {
+              // Urutkan berdasarkan notif.type: 'setoran' atau 'pelunasan' di atas
+              const isPrioritas = n => n.type === 'setoran' || n.type === 'pelunasan';
+              // Helper untuk urut waktu descending jika ada
+              const sortByTimeDesc = arr => {
+                return arr.slice().sort((a, b) => {
+                  const ta = a.timestamp || a.time || '';
+                  const tb = b.timestamp || b.time || '';
+                  if (!ta && !tb) return 0;
+                  if (!ta) return 1;
+                  if (!tb) return -1;
+                  // Coba parse ke Date, fallback string compare
+                  const da = new Date(ta);
+                  const db = new Date(tb);
+                  if (!isNaN(da) && !isNaN(db)) return db - da;
+                  return String(tb).localeCompare(String(ta));
+                });
+              };
+              const prioritas = sortByTimeDesc(notifications.filter(isPrioritas));
+              const lainnya = sortByTimeDesc(notifications.filter(n => !isPrioritas(n)));
+              const ordered = [...prioritas, ...lainnya];
+              return (
+                <ul className="divide-y divide-gray-100">
+                  {ordered.map((notif, idx) => (
+                    <li
+                      key={idx}
+                      className={`relative p-4 text-sm flex items-start gap-3 group transition-colors duration-150 ${!notif.read ? "bg-white" : "bg-white"}`}
                     >
-                      {notif.actionLabel || "Lihat Detail"}
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+                      {/* Dot merah untuk unread */}
+                      {!notif.read && (
+                        <span className="mt-1 w-2 h-2 rounded-full bg-red-500 flex-shrink-0 animate-pulse" title="Belum dibaca"></span>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className={`mb-1 flex items-center gap-2 ${!notif.read ? "font-bold text-gray-800" : "font-normal text-gray-400"}`}>
+                          {notif.title}
+                        </div>
+                        <div className={`${!notif.read ? "text-gray-800" : "text-gray-400"} mb-1`}>{notif.message}</div>
+                        {notif.time && <div className="text-xs text-gray-300">{notif.time}</div>}
+                        {notif.action && (
+                          <button
+                            className={`mt-2 text-xs font-semibold text-indigo-600 hover:underline`}
+                            onClick={notif.action}
+                          >
+                            {notif.actionLabel || "Lihat Detail"}
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()
           )}
         </div>
       )}
