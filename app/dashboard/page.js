@@ -429,7 +429,7 @@ function DashboardContent() {
               {/* Section: Profile & Progress */}
               <div className={"lg:col-span-2 space-y-6"}>
                 {/* Jika user belum setoran awal, tampilkan profil dan form setoran awal saja, lebar sama, stacked */}
-                {(!profile || !profile.IsInitialDepositMade || profile.InitialDepositStatus !== "Approved") ? (
+                {profile && !profile.IsInitialDepositMade ? (
                   <>
                     <ProfilePequrban profile={profile} loadingProfile={loadingProfile || loadingInitial} />
                     <div className="my-4 border-t border-gray-300" />

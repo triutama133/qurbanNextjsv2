@@ -48,23 +48,36 @@ export default function PersonalProgress({
     }
   }
 
-  // Notifikasi jika capaian sudah mencapai target
+  // Notifikasi jika capaian sudah mencapai target (net saving)
   const sudahCapaiTarget = currentNetSaving >= targetPribadi && targetPribadi > 0;
+  // Notifikasi jika sudah transfer ke panitia
+  const sudahTransferKePanitia = totalTransferred >= targetPribadi && targetPribadi > 0;
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg">
       <h2 className="text-xl font-bold mb-4 text-green-800">Capaian Pribadi Anda</h2>
-      {sudahCapaiTarget && (
+      {/* Notifikasi: jika sudah transfer ke panitia, tampilkan ini saja */}
+      {sudahTransferKePanitia ? (
         <div className="mb-4">
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4 flex items-center">
             <svg className="w-6 h-6 text-blue-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 20.5C6.201 20.5 1 15.299 1 9.5S6.201-1.5 12-1.5 23 4.701 23 10.5 17.799 20.5 12 20.5z" /></svg>
             <div>
-              <span className="font-semibold text-blue-800">Selamat! Tabungan Anda sudah mencapai target.</span>
-              <div className="text-blue-700 text-sm mt-1">Segera lakukan transfer pelunasan ke panitia agar status Anda tercatat lunas.</div>
+              <span className="font-semibold text-blue-800">Selamat Tabungan Kamu sudah di transfer ke panitia dan tercatat lunas.</span>
+              <div className="text-blue-700 text-sm mt-1">Terima kasih sudah bergabung dalam program ini. Sampai jumpa di program selanjutnya ya!</div>
             </div>
           </div>
         </div>
-      )}
+      ) : sudahCapaiTarget ? (
+        <div className="mb-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-4 flex items-center">
+            <svg className="w-6 h-6 text-blue-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 20.5C6.201 20.5 1 15.299 1 9.5S6.201-1.5 12-1.5 23 4.701 23 10.5 17.799 20.5 12 20.5z" /></svg>
+            <div>
+              <span className="font-semibold text-blue-800">Selamat! Tabungan Kamu sudah mencapai target.</span>
+              <div className="text-blue-700 text-sm mt-1">Segera lakukan transfer pelunasan ke panitia agar status Kamu tercatat lunas.</div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div id="personal-progress-container">
         <div className="relative pt-1">
           <div className="flex mb-2 items-center justify-between">
