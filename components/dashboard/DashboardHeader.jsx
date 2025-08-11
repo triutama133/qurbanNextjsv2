@@ -1,6 +1,6 @@
 "use client"
 
-export default function DashboardHeader({ profile, handleRefreshDashboard, handleSignOut, children }) {
+export default function DashboardHeader({ profile, handleRefreshDashboard, handleSignOut, handleGoToHelpDesk, children }) {
   return (
     <header className="bg-white shadow-sm">
       <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
@@ -23,6 +23,7 @@ export default function DashboardHeader({ profile, handleRefreshDashboard, handl
               Pengaturan Akun
             </a>
             <button
+              id="refresh-dashboard-btn"
               onClick={handleRefreshDashboard}
               className="inline-flex items-center justify-center border border-gray-300 bg-white text-sm font-medium text-gray-700 px-4 py-2 rounded-md shadow-sm hover:bg-green-50 hover:text-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 gap-1"
               title="Refresh Data"
@@ -36,6 +37,14 @@ export default function DashboardHeader({ profile, handleRefreshDashboard, handl
                 ></path>
               </svg>
               <span>Refresh</span>
+            </button>
+            {/* Tombol Help Desk di antara Refresh dan Logout */}
+            <button
+              onClick={handleGoToHelpDesk}
+              className="inline-flex items-center justify-center border border-gray-300 bg-white text-sm font-medium text-indigo-700 px-4 py-2 rounded-md shadow-sm hover:bg-indigo-50 hover:text-indigo-800 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              title="Help Desk"
+            >
+              Help Desk
             </button>
             <button
               onClick={handleSignOut}

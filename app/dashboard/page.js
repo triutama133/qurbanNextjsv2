@@ -16,7 +16,8 @@ import PersonalProgress from "@/components/dashboard/PersonalProgress"
 import MilestoneProgram from "@/components/dashboard/MilestoneProgram"
 import NewsSection from "@/components/dashboard/NewsSection"
 import DocumentsResources from "@/components/dashboard/DocumentsResources"
-import TransactionForms from "@/components/dashboard/TransactionForms"
+import dynamic from "next/dynamic"
+const TransactionForms = dynamic(() => import("@/components/dashboard/TransactionForms"), { ssr: false })
 import SavingHistory from "@/components/dashboard/SavingHistory"
 import TransferHistory from "@/components/dashboard/TransferHistory"
 import HelpDeskSection from "@/components/dashboard/HelpDeskSection"
@@ -73,15 +74,20 @@ function MobileDashboardTabs({
               formatRupiah={formatRupiah}
               getMonthDifference={getMonthDifference}
             />
-            <TransactionForms {...transactionProps} />
-            <SavingHistory
-              personalSavingHistory={transactionProps.personalSavingHistory}
-              loadingPersonal={loadingPersonal}
-              formatRupiah={formatRupiah}
-              showConfirmModal={transactionProps.showConfirmModal}
-              handleEditTransaction={transactionProps.handleEditTransaction}
-              handleDeleteTransaction={transactionProps.handleDeleteSaving}
-            />
+            {/* TransactionForms harus tetap dirender di mobile agar warning pelunasan pending/approved muncul */}
+            {profile && (
+              <TransactionForms {...transactionProps} />
+            )}
+            <div className="mb-4">
+              <SavingHistory
+                personalSavingHistory={transactionProps.personalSavingHistory}
+                loadingPersonal={loadingPersonal}
+                formatRupiah={formatRupiah}
+                showConfirmModal={transactionProps.showConfirmModal}
+                handleEditTransaction={transactionProps.handleEditTransaction}
+                handleDeleteTransaction={transactionProps.handleDeleteSaving}
+              />
+            </div>
             <TransferHistory
               profile={profile}
               allPersonalTransferConfirmations={transactionProps.allPersonalTransferConfirmations}
@@ -110,6 +116,12 @@ function MobileDashboardTabs({
 
 // Komponen untuk menangani useSearchParams dengan Suspense
 function DashboardContent() {
+  // Handler untuk tombol Help Desk
+  const handleGoToHelpDesk = () => {
+    const params = new URLSearchParams(window.location.search)
+    params.set("tab", "helpdesk")
+    router.push(`/dashboard?${params.toString()}`)
+  }
   // Fetch all news for notification bell (tanpa paging)
   const [allNews, setAllNews] = useState([])
   useEffect(() => {
@@ -395,6 +407,7 @@ function DashboardContent() {
         profile={profile}
         handleRefreshDashboard={handleRefreshDashboard}
         handleSignOut={handleSignOut}
+        handleGoToHelpDesk={handleGoToHelpDesk}
       >
         {profile && profile.IsInitialDepositMade && (
           <div className="ml-2">
@@ -415,138 +428,160 @@ function DashboardContent() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Section: Profile & Progress */}
               <div className={"lg:col-span-2 space-y-6"}>
-                <ProfilePequrban profile={profile} loadingProfile={loadingProfile || loadingInitial} />
-                {/* Mobile: Tab menu below profile, default tab = capaian & transaksi */}
-                <MobileDashboardTabs
-                  user={user}
-                  readNewsIds={readNewsIds}
-                  setReadNewsIds={setReadNewsIds}
-                  profile={profile}
-                  loadingProfile={loadingProfile || loadingInitial}
-                  appConfig={appConfig}
-                  personalTotalRecorded={personalTotalRecorded}
-                  personalUsed={personalUsed}
-                  personalTransferred={personalTransferred}
-                  loadingPersonal={loadingPersonal || loadingInitial}
-                  formatRupiah={formatRupiah}
-                  getMonthDifference={getMonthDifference}
-                  transactionProps={{
-                    profile,
-                    appConfig,
-                    user,
-                    personalTotalRecorded,
-                    personalUsed,
-                    personalSavingHistory,
-                    personalTransferConfirmations,
-                    allPersonalTransferConfirmations,
-                    addSavingLoading,
-                    useSavingLoading,
-                    confirmTransferLoading,
-                    handleAddSaving,
-                    handleUseSaving,
-                    handleInitialDeposit,
-                    handleConfirmTransfer,
-                    handleDeleteSaving,
-                    handleDeleteTransferConfirmation,
-                    formatRupiah,
-                    showConfirmModal,
-                    handleEditTransaction,
-                    personalTransferred,
-                  }}
-                  milestones={milestones}
-                  loadingMilestones={loadingMilestones || loadingInitial}
-                  news={news}
-                  loadingNews={loadingNews || loadingInitial}
-                  newsPage={newsPage}
-                  setNewsPage={setNewsPage}
-                  totalNewsPages={totalNewsPages}
-                  documents={documents}
-                  loadingDocuments={loadingDocuments || loadingInitial}
-                />
-                {/* Desktop: as before (tidak dobel) */}
-                <div className="hidden lg:block space-y-6">
-                  <PersonalProgress
-                    profile={profile}
-                    globalConfig={appConfig}
-                    personalTotalRecorded={personalTotalRecorded}
-                    personalUsed={personalUsed}
-                    personalTransferred={personalTransferred}
-                    loadingPersonal={loadingPersonal || loadingInitial}
-                    formatRupiah={formatRupiah}
-                    getMonthDifference={getMonthDifference}
-                  />
-                  <MilestoneProgram milestones={milestones} loadingMilestones={loadingMilestones || loadingInitial} />
-                  <NewsSection
-                    userId={user?.id}
-                    readNewsIds={readNewsIds}
-                    setReadNewsIds={setReadNewsIds}
-                    loadingNews={loadingNews || loadingInitial}
-                  />
-                  <DocumentsResources documents={documents} loadingDocuments={loadingDocuments || loadingInitial} />
-                </div>
+                {/* Jika user belum setoran awal, tampilkan profil dan form setoran awal saja, lebar sama, stacked */}
+                {(!profile || !profile.IsInitialDepositMade || profile.InitialDepositStatus !== "Approved") ? (
+                  <>
+                    <ProfilePequrban profile={profile} loadingProfile={loadingProfile || loadingInitial} />
+                    <div className="my-4 border-t border-gray-300" />
+                    {/* Alert info setoran awal */}
+                    <div className="mb-4 p-4 rounded-md bg-yellow-100 border-l-4 border-yellow-400 flex items-center">
+                      <svg className="w-6 h-6 text-yellow-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z" />
+                      </svg>
+                      <span className="text-yellow-800 font-medium">
+                        Anda belum melakukan <b>setoran awal</b>. Silakan lakukan setoran awal untuk mengaktifkan seluruh fitur tabungan qurban.
+                      </span>
+                    </div>
+                    {/* TransactionForms hanya untuk setoran awal, tetap di sini */}
+                    <TransactionForms
+                      profile={profile}
+                      appConfig={appConfig}
+                      user={user}
+                      personalTotalRecorded={personalTotalRecorded}
+                      personalUsed={personalUsed}
+                      personalSavingHistory={personalSavingHistory}
+                      allPersonalTransferConfirmations={allPersonalTransferConfirmations}
+                      addSavingLoading={addSavingLoading}
+                      useSavingLoading={useSavingLoading}
+                      confirmTransferLoading={confirmTransferLoading}
+                      handleAddSaving={handleAddSaving}
+                      handleUseSaving={handleUseSaving}
+                      handleInitialDeposit={handleInitialDeposit}
+                      handleConfirmTransfer={handleConfirmTransfer}
+                      handleDeleteSaving={handleDeleteSaving}
+                      handleDeleteTransferConfirmation={handleDeleteTransferConfirmation}
+                      formatRupiah={formatRupiah}
+                      loadingPersonal={loadingPersonal || loadingInitial}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <ProfilePequrban profile={profile} loadingProfile={loadingProfile || loadingInitial} />
+                    {/* Mobile: Tab menu tetap, tapi fitur di dalamnya juga dikondisikan */}
+                    <MobileDashboardTabs
+                      user={user}
+                      readNewsIds={readNewsIds}
+                      setReadNewsIds={setReadNewsIds}
+                      profile={profile}
+                      loadingProfile={loadingProfile || loadingInitial}
+                      appConfig={appConfig}
+                      personalTotalRecorded={personalTotalRecorded}
+                      personalUsed={personalUsed}
+                      personalTransferred={personalTransferred}
+                      loadingPersonal={loadingPersonal || loadingInitial}
+                      formatRupiah={formatRupiah}
+                      getMonthDifference={getMonthDifference}
+                      transactionProps={{
+                        profile,
+                        appConfig,
+                        user,
+                        personalTotalRecorded,
+                        personalUsed,
+                        personalSavingHistory,
+                        allPersonalTransferConfirmations,
+                        addSavingLoading,
+                        useSavingLoading,
+                        confirmTransferLoading,
+                        handleAddSaving,
+                        handleUseSaving,
+                        handleInitialDeposit,
+                        handleConfirmTransfer,
+                        handleDeleteSaving,
+                        handleDeleteTransferConfirmation,
+                        formatRupiah,
+                        showConfirmModal,
+                        handleEditTransaction,
+                        personalTransferred,
+                      }}
+                      milestones={milestones}
+                      loadingMilestones={loadingMilestones}
+                      news={news}
+                      loadingNews={loadingNews}
+                      newsPage={newsPage}
+                      setNewsPage={setNewsPage}
+                      totalNewsPages={totalNewsPages}
+                      documents={documents}
+                      loadingDocuments={loadingDocuments}
+                    />
+                    {/* Desktop: fitur-fitur lain hanya tampil jika setoran awal sudah dibuat dan approved */}
+                    <div className="hidden lg:block space-y-6">
+                      <PersonalProgress
+                        profile={profile}
+                        globalConfig={appConfig}
+                        personalTotalRecorded={personalTotalRecorded}
+                        personalUsed={personalUsed}
+                        personalTransferred={personalTransferred}
+                        loadingPersonal={loadingPersonal || loadingInitial}
+                        formatRupiah={formatRupiah}
+                        getMonthDifference={getMonthDifference}
+                      />
+                      <MilestoneProgram milestones={milestones} loadingMilestones={loadingMilestones} />
+                      <NewsSection
+                        userId={user?.id}
+                        readNewsIds={readNewsIds}
+                        setReadNewsIds={setReadNewsIds}
+                        loadingNews={loadingNews}
+                      />
+                      <DocumentsResources documents={documents} loadingDocuments={loadingDocuments} />
+                    </div>
+                  </>
+                )}
               </div>
               {/* Section: Transaction & History (desktop only) */}
               <div className="hidden lg:block lg:col-span-1 space-y-6">
-                <TransactionForms
-                  profile={profile}
-                  appConfig={appConfig}
-                  user={user}
-                  personalTotalRecorded={personalTotalRecorded}
-                  personalUsed={personalUsed}
-                  personalSavingHistory={personalSavingHistory}
-                  personalTransferConfirmations={personalTransferConfirmations}
-                  addSavingLoading={addSavingLoading}
-                  useSavingLoading={useSavingLoading}
-                  confirmTransferLoading={confirmTransferLoading}
-                  handleAddSaving={handleAddSaving}
-                  handleUseSaving={handleUseSaving}
-                  handleInitialDeposit={handleInitialDeposit}
-                  handleConfirmTransfer={handleConfirmTransfer}
-                  handleDeleteSaving={handleDeleteSaving}
-                  handleDeleteTransferConfirmation={handleDeleteTransferConfirmation}
-                  formatRupiah={formatRupiah}
-                  loadingPersonal={loadingPersonal || loadingInitial}
-                />
-                <SavingHistory
-                  personalSavingHistory={personalSavingHistory}
-                  loadingPersonal={loadingPersonal || loadingInitial}
-                  formatRupiah={formatRupiah}
-                  showConfirmModal={showConfirmModal}
-                  handleEditTransaction={handleEditTransaction}
-                  handleDeleteTransaction={handleDeleteSaving}
-                />
-                <TransferHistory
-                  profile={profile}
-                  allPersonalTransferConfirmations={allPersonalTransferConfirmations}
-                  loadingPersonal={loadingPersonal || loadingInitial}
-                  formatRupiah={formatRupiah}
-                />
+                {(profile && profile.IsInitialDepositMade && profile.InitialDepositStatus === "Approved") ? (
+                  <>
+                  
+                    {/* TransactionForms hanya di kolom kanan desktop setelah setoran awal approved */}
+                    <TransactionForms
+                      profile={profile}
+                      appConfig={appConfig}
+                      user={user}
+                      personalTotalRecorded={personalTotalRecorded}
+                      personalUsed={personalUsed}
+                      personalSavingHistory={personalSavingHistory}
+                      allPersonalTransferConfirmations={allPersonalTransferConfirmations}
+                      addSavingLoading={addSavingLoading}
+                      useSavingLoading={useSavingLoading}
+                      confirmTransferLoading={confirmTransferLoading}
+                      handleAddSaving={handleAddSaving}
+                      handleUseSaving={handleUseSaving}
+                      handleInitialDeposit={handleInitialDeposit}
+                      handleConfirmTransfer={handleConfirmTransfer}
+                      handleDeleteSaving={handleDeleteSaving}
+                      handleDeleteTransferConfirmation={handleDeleteTransferConfirmation}
+                      formatRupiah={formatRupiah}
+                      loadingPersonal={loadingPersonal || loadingInitial}
+                    />
+                    <SavingHistory
+                      personalSavingHistory={personalSavingHistory}
+                      loadingPersonal={loadingPersonal || loadingInitial}
+                      formatRupiah={formatRupiah}
+                      showConfirmModal={showConfirmModal}
+                      handleEditTransaction={handleEditTransaction}
+                      handleDeleteTransaction={handleDeleteSaving}
+                    />
+                    <TransferHistory
+                      profile={profile}
+                      allPersonalTransferConfirmations={allPersonalTransferConfirmations}
+                      loadingPersonal={loadingPersonal || loadingInitial}
+                      formatRupiah={formatRupiah}
+                    />
+                  </>
+                ) : null}
               </div>
               {/* Section: Transaction (mobile/initial deposit not made) */}
-              {(!profile || !profile.IsInitialDepositMade || profile.InitialDepositStatus !== "Approved") && (
-                <div className="lg:col-span-3">
-                  <TransactionForms
-                    profile={profile}
-                    appConfig={appConfig}
-                    user={user}
-                    personalTotalRecorded={personalTotalRecorded}
-                    personalUsed={personalUsed}
-                    personalSavingHistory={personalSavingHistory}
-                    personalTransferConfirmations={personalTransferConfirmations}
-                    addSavingLoading={addSavingLoading}
-                    useSavingLoading={useSavingLoading}
-                    confirmTransferLoading={confirmTransferLoading}
-                    handleAddSaving={handleAddSaving}
-                    handleUseSaving={handleUseSaving}
-                    handleInitialDeposit={handleInitialDeposit}
-                    handleConfirmTransfer={handleConfirmTransfer}
-                    handleDeleteSaving={handleDeleteSaving}
-                    handleDeleteTransferConfirmation={handleDeleteTransferConfirmation}
-                    formatRupiah={formatRupiah}
-                    loadingPersonal={loadingPersonal || loadingInitial}
-                  />
-                </div>
-              )}
+              {/* Hapus TransactionForms di bawah, hanya tampilkan di kolom kanan jika user belum setoran awal */}
             </div>
           )}
         </div>

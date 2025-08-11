@@ -67,6 +67,13 @@ export default function SavingHistory({
     return numericValue ? Number.parseInt(numericValue, 10).toLocaleString("id-ID") : ""
   }
 
+  // Sort history so the most recent (by Tanggal) is at the top
+  const sortedHistory = [...personalSavingHistory].sort((a, b) => {
+    const dateA = new Date(a.Tanggal)
+    const dateB = new Date(b.Tanggal)
+    return dateB - dateA
+  })
+
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg">
       <h3 className="text-lg font-bold text-gray-900 mb-2">Riwayat Tabungan Tercatat</h3>
@@ -74,16 +81,15 @@ export default function SavingHistory({
         <ListSkeleton />
       ) : (
         <div className="max-h-96 overflow-y-auto pr-2">
-          {personalSavingHistory.length > 0 ? (
-            personalSavingHistory.map((item) => (
+          {sortedHistory.length > 0 ? (
+            sortedHistory.map((item) => (
               <div
                 key={item.TransaksiId}
                 className="flex justify-between items-center py-3 border-b border-gray-200 last:border-b-0"
               >
                 <div className="flex-1">
                   <p className="font-medium text-sm">
-                    {item.Tipe === "Penggunaan" ? "-" : ""}
-                    {formatRupiah(item.Jumlah)}
+                    {formatRupiah(item.Tipe === "Penggunaan" ? -Math.abs(item.Jumlah) : item.Jumlah)}
                     <span
                       className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${
                         item.Tipe === "Setoran" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
@@ -109,63 +115,14 @@ export default function SavingHistory({
 
                 <div className="flex items-center gap-2 ml-4">
                   {/* Edit Button */}
-                  <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditClick(item)}
-                        className="text-blue-500 hover:text-blue-700 p-1"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                        <DialogTitle>Edit Transaksi</DialogTitle>
-                        <DialogDescription>Ubah nominal dan tanggal transaksi Anda.</DialogDescription>
-                      </DialogHeader>
-                      <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="edit-amount" className="text-right">
-                            Nominal
-                          </Label>
-                          <Input
-                            id="edit-amount"
-                            value={editAmount}
-                            onChange={(e) => {
-                              const formatted = formatAmountInput(e.target.value)
-                              setEditAmount(formatted)
-                            }}
-                            className="col-span-3"
-                            placeholder="Masukkan nominal"
-                          />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                          <Label htmlFor="edit-date" className="text-right">
-                            Tanggal
-                          </Label>
-                          <Input
-                            id="edit-date"
-                            type="date"
-                            value={editDate}
-                            onChange={(e) => setEditDate(e.target.value)}
-                            className="col-span-3"
-                          />
-                        </div>
-                      </div>
-                      <DialogFooter>
-                        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-2 w-full">
-                          <Button className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto" onClick={() => setIsEditDialogOpen(false)}>
-                            Batal
-                          </Button>
-                          <Button className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" onClick={handleSaveEdit}>
-                            Simpan Perubahan
-                          </Button>
-                        </div>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditClick(item)}
+                    className="text-blue-500 hover:text-blue-700 p-1"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
 
                   {/* Delete Button */}
                   <AlertDialog>
@@ -202,6 +159,54 @@ export default function SavingHistory({
           )}
         </div>
       )}
+      {/* Single Edit Dialog rendered once only */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Transaksi</DialogTitle>
+            <DialogDescription>Ubah nominal dan tanggal transaksi Anda.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-amount" className="text-right">
+                Nominal
+              </Label>
+              <Input
+                id="edit-amount"
+                value={editAmount}
+                onChange={(e) => {
+                  const formatted = formatAmountInput(e.target.value)
+                  setEditAmount(formatted)
+                }}
+                className="col-span-3"
+                placeholder="Masukkan nominal"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="edit-date" className="text-right">
+                Tanggal
+              </Label>
+              <Input
+                id="edit-date"
+                type="date"
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+                className="col-span-3"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-2 w-full">
+              <Button className="bg-red-600 hover:bg-red-700 text-white w-full sm:w-auto" onClick={() => setIsEditDialogOpen(false)}>
+                Batal
+              </Button>
+              <Button className="bg-green-600 hover:bg-green-700 text-white w-full sm:w-auto" onClick={handleSaveEdit}>
+                Simpan Perubahan
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

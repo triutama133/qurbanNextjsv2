@@ -4,7 +4,15 @@ export default function MilestoneProgram({ milestones, loadingMilestones }) {
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg">
       <h2 className="text-xl font-bold mb-4 text-gray-800">Milestone Program</h2>
-      {/* Keterangan urutan */}
+      <div className="bg-yellow-100 border-l-4 border-yellow-400 text-yellow-800 p-4 rounded-md text-center max-w-md mx-auto">
+        <span className="font-semibold">Fitur ini sedang dalam pengembangan.</span>
+        <br />
+        Silakan cek kembali di update berikutnya.
+      </div>
+
+      {/*
+      --- KONTEN ASLI MILESTONE ---
+      Keterangan urutan
       <div className="mb-2">
         <span className="block text-xs text-gray-500 lg:hidden">Urutan bulan: baca dari atas ke bawah, lalu ke kolom kanan.</span>
         <span className="hidden lg:block text-xs text-gray-500">Urutan bulan: baca dari kiri ke kanan, baris per baris.</span>
@@ -14,7 +22,7 @@ export default function MilestoneProgram({ milestones, loadingMilestones }) {
       ) : (
         // Mobile: grid 2 kolom urut vertikal, Desktop: grid 3 kolom
         <div>
-          {/* Mobile: grid 2 kolom urut vertikal */}
+          // Mobile: grid 2 kolom urut vertikal
           <div className="grid grid-cols-2 gap-4 pb-2 lg:hidden">
             {(() => {
               if (!milestones || milestones.length === 0) {
@@ -77,7 +85,7 @@ export default function MilestoneProgram({ milestones, loadingMilestones }) {
               );
             })()}
           </div>
-          {/* Desktop: grid 3 kolom urut biasa */}
+          // Desktop: grid 3 kolom urut biasa
           <div className="hidden lg:grid lg:grid-cols-3 gap-4 pb-2">
             {(() => {
               if (!milestones || milestones.length === 0) {
@@ -125,6 +133,7 @@ export default function MilestoneProgram({ milestones, loadingMilestones }) {
           </div>
         </div>
       )}
+      */}
     </div>
   )
 }

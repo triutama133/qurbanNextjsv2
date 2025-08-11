@@ -45,31 +45,23 @@ export function useDashboardActions({
     setAddSavingLoading(true)
     const amountInput = e.target.elements.amount
     const amount = Number.parseFloat(amountInput.value.replace(/[^0-9]/g, ""))
-    const savingMessageEl = document.getElementById("savingMessage")
 
     if (profile?.IsInitialDepositMade && profile?.InitialDepositStatus !== "Approved") {
-      savingMessageEl.textContent =
-        "Setoran awal Anda belum diverifikasi admin. Harap tunggu verifikasi sebelum mencatat tabungan rutin."
-      savingMessageEl.className = "text-sm mt-3 text-yellow-600"
       setAddSavingLoading(false)
-      return
+      throw new Error("Setoran awal Anda belum diverifikasi admin. Harap tunggu verifikasi sebelum mencatat tabungan rutin.")
     }
 
     if (isNaN(amount) || amount <= 0) {
-      savingMessageEl.textContent = "Jumlah tabungan tidak valid."
-      savingMessageEl.className = "text-sm mt-3 text-red-600"
       setAddSavingLoading(false)
-      return
+      throw new Error("Jumlah tabungan tidak valid.")
     }
 
     let proofUrl = null
     if (profile?.MetodeTabungan === "Setor ke Tim") {
       const proofFile = e.target.elements.proofFile?.files[0]
       if (!proofFile) {
-        savingMessageEl.textContent = "Bukti setor wajib diunggah untuk metode ini."
-        savingMessageEl.className = "text-sm mt-3 text-red-600"
         setAddSavingLoading(false)
-        return
+        throw new Error("Bukti setor wajib diunggah untuk metode ini.")
       }
       try {
         const fileData = {
@@ -88,14 +80,12 @@ export function useDashboardActions({
         }
         proofUrl = uploadResult.fileUrl
       } catch (uploadErr) {
+        setAddSavingLoading(false)
         throw new Error(`Gagal mengunggah bukti: ${uploadErr.message}`)
       }
     }
 
     try {
-      savingMessageEl.textContent = "Menyimpan..."
-      savingMessageEl.className = "text-sm mt-3 text-gray-600"
-
       const newTransactionId = `TRX-${Date.now()}`
       const newTanggal = new Date().toISOString()
 
@@ -132,14 +122,10 @@ export function useDashboardActions({
         ].sort((a, b) => new Date(b.Tanggal) - new Date(a.Tanggal)),
       )
       setPersonalTotalRecorded((prev) => prev + amount)
-
-      savingMessageEl.textContent = "Tabungan berhasil dicatat!"
-      savingMessageEl.className = "text-sm mt-3 text-green-600"
       e.target.reset()
     } catch (err) {
       console.error("Error adding saving:", err.message)
-      savingMessageEl.textContent = "Gagal mencatat tabungan: " + err.message
-      savingMessageEl.className = "text-sm mt-3 text-red-600"
+      throw err
     } finally {
       setAddSavingLoading(false)
     }
@@ -150,27 +136,19 @@ export function useDashboardActions({
     setUseSavingLoading(true)
     const usedAmountInput = e.target.elements.usedAmount
     const usedAmount = Number.parseFloat(usedAmountInput.value.replace(/[^0-9]/g, ""))
-    const usedMessageEl = document.getElementById("usedMessage")
 
     const currentNetSaving = personalTotalRecorded - personalUsed
 
     if (isNaN(usedAmount) || usedAmount <= 0) {
-      usedMessageEl.textContent = "Jumlah penggunaan tidak valid."
-      usedMessageEl.className = "text-sm mt-3 text-red-600"
       setUseSavingLoading(false)
-      return
+      throw new Error("Jumlah penggunaan tidak valid.")
     }
     if (usedAmount > currentNetSaving) {
-      usedMessageEl.textContent = `Jumlah penggunaan melebihi tabungan tersedia (${formatRupiah(currentNetSaving)}).`
-      usedMessageEl.className = "text-sm mt-3 text-red-600"
       setUseSavingLoading(false)
-      return
+      throw new Error(`Jumlah penggunaan melebihi tabungan tersedia (${formatRupiah(currentNetSaving)}).`)
     }
 
     try {
-      usedMessageEl.textContent = "Mencatat penggunaan..."
-      usedMessageEl.className = "text-sm mt-3 text-gray-600"
-
       const newTransactionId = `USE-${Date.now()}`
       const newTanggal = new Date().toISOString()
 
@@ -207,14 +185,10 @@ export function useDashboardActions({
         ].sort((a, b) => new Date(b.Tanggal) - new Date(a.Tanggal)),
       )
       setPersonalUsed((prev) => prev + usedAmount)
-
-      usedMessageEl.textContent = "Penggunaan tabungan berhasil dicatat!"
-      usedMessageEl.className = "text-sm mt-3 text-green-600"
       e.target.reset()
     } catch (err) {
       console.error("Error using saving:", err.message)
-      usedMessageEl.textContent = "Gagal mencatat penggunaan tabungan: " + err.message
-      usedMessageEl.className = "text-sm mt-3 text-red-600"
+      throw err
     } finally {
       setUseSavingLoading(false)
     }

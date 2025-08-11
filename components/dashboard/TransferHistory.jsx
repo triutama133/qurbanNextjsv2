@@ -1,21 +1,18 @@
+
+"use client";
 import { ListSkeleton } from "./LoadingSkeletons"
 
-// Gunakan allPersonalTransferConfirmations agar semua status tampil
 export default function TransferHistory({ profile, allPersonalTransferConfirmations = [], loadingPersonal, formatRupiah }) {
-  if (!profile) {
-    return null
-  }
-
+  const isLoading = loadingPersonal || !profile;
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg">
       <h3 className="text-lg font-bold mb-2 text-gray-900">Riwayat Konfirmasi Transfer ke Panitia Qurban</h3>
-      {loadingPersonal ? (
+      {isLoading ? (
         <ListSkeleton />
       ) : (
         <div className="max-h-96 overflow-y-auto pr-2">
           {allPersonalTransferConfirmations.length > 0 ? (
             allPersonalTransferConfirmations.map((item) => {
-              // Tentukan label
               const label = (item.Type === "Setoran Awal" || item.Tipe === "Setoran Awal") ? "Setoran Awal" : "Pelunasan";
               return (
                 <div
