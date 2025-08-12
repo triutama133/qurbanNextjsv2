@@ -5,8 +5,8 @@ import { ListSkeleton } from "./LoadingSkeletons"
 export default function TransferHistory({ profile, allPersonalTransferConfirmations = [], loadingPersonal, formatRupiah }) {
   const isLoading = loadingPersonal || !profile;
   return (
-    <div className="bg-white p-6 rounded-xl shadow-lg">
-      <h3 className="text-lg font-bold mb-2 text-gray-900">Riwayat Konfirmasi Transfer ke Panitia Qurban</h3>
+    <div className="bg-white p-6 rounded-xl shadow-lg text-black">
+      <h3 className="text-lg font-bold mb-2 text-black">Riwayat Konfirmasi Transfer ke Panitia Qurban</h3>
       {isLoading ? (
         <ListSkeleton />
       ) : (

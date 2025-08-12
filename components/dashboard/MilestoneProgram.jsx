@@ -2,8 +2,8 @@ import { ListSkeleton } from "./LoadingSkeletons"
 
 export default function MilestoneProgram({ milestones, loadingMilestones }) {
   return (
-    <div className="bg-white p-6 rounded-xl shadow-lg">
-      <h2 className="text-xl font-bold mb-4 text-gray-800">Milestone Program</h2>
+    <div className="bg-white p-6 rounded-xl shadow-lg text-black">
+      <h2 className="text-xl font-bold mb-4 text-black">Milestone Program</h2>
       <div className="bg-yellow-100 border-l-4 border-yellow-400 text-yellow-800 p-4 rounded-md text-center max-w-md mx-auto">
         <span className="font-semibold">Fitur ini sedang dalam pengembangan.</span>
         <br />

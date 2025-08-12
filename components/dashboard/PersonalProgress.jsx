@@ -10,6 +10,7 @@ export default function PersonalProgress({
   loadingPersonal,
   formatRupiah,
   getMonthDifference,
+  allPersonalTransferConfirmations,
 }) {
   if (loadingPersonal) {
     return (
@@ -23,15 +24,18 @@ export default function PersonalProgress({
 
   // Perhitungan transferred: hanya Setoran Awal Approved dan Pelunasan Approved
   let totalTransferred = 0;
-  // Ambil data transfer dari profile.transferConfirmations jika ada
-  if (profile && Array.isArray(profile.transferConfirmations)) {
-    totalTransferred = profile.transferConfirmations
-      .filter(item => item.Status === "Approved")
-      .reduce((sum, item) => sum + (item.Amount || 0), 0);
-  } else if (typeof personalTransferred === 'number') {
-    // fallback lama
-    totalTransferred = personalTransferred;
-  }
+  let totalSetoranAwal = 0;
+  let totalPelunasan = 0;
+  const transferData = Array.isArray(allPersonalTransferConfirmations) && allPersonalTransferConfirmations.length > 0
+    ? allPersonalTransferConfirmations
+    : (profile && Array.isArray(profile.transferConfirmations) ? profile.transferConfirmations : []);
+  totalSetoranAwal = transferData
+    .filter(item => item.Status === "Approved" && item.Type?.toLowerCase() === "setoran awal")
+    .reduce((sum, item) => sum + (item.Amount || 0), 0);
+  totalPelunasan = transferData
+    .filter(item => item.Status === "Approved" && item.Type?.toLowerCase() === "pelunasan")
+    .reduce((sum, item) => sum + (item.Amount || 0), 0);
+  totalTransferred = totalSetoranAwal + totalPelunasan;
 
   // Rekomendasi Tabung Per Bulan
   const targetDateGlobal = globalConfig?.TanggalTargetQurban ? new Date(globalConfig.TanggalTargetQurban) : null
@@ -39,7 +43,9 @@ export default function PersonalProgress({
   let rekomendasiTabungPerBulan = 0
   const currentNetSaving = personalTotalRecorded - personalUsed
   const targetPribadi = profile?.TargetPribadi || globalConfig?.TargetPribadiDefault || 0;
-  const remainingToTarget = targetPribadi - currentNetSaving
+  const jumlahPequrban = profile?.JumlahPequrban || 1;
+  const targetTotal = targetPribadi * jumlahPequrban;
+  const remainingToTarget = targetTotal - currentNetSaving;
 
   if (targetDateGlobal && targetDateGlobal > today && remainingToTarget > 0) {
     const remainingMonths = getMonthDifference(today, targetDateGlobal)
@@ -49,15 +55,29 @@ export default function PersonalProgress({
   }
 
   // Notifikasi jika capaian sudah mencapai target (net saving)
-  const sudahCapaiTarget = currentNetSaving >= targetPribadi && targetPribadi > 0;
+  const sudahCapaiTarget = currentNetSaving >= targetTotal && targetTotal > 0;
   // Notifikasi jika sudah transfer ke panitia
-  const sudahTransferKePanitia = totalTransferred >= targetPribadi && targetPribadi > 0;
+  const sudahTransferKePanitia = totalTransferred >= targetTotal && targetTotal > 0;
+  // Notifikasi jika setoran awal kurang dari target setoran awal
+  const initialDepositPerPequrban = globalConfig?.InitialDepositAmount || 300000;
+  const targetSetoranAwal = initialDepositPerPequrban * jumlahPequrban;
+  const setoranAwalKurang = totalSetoranAwal < targetSetoranAwal;
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-lg">
+    <div className="bg-white p-6 rounded-xl shadow-lg text-black">
       <h2 className="text-xl font-bold mb-4 text-green-800">Capaian Pribadi Anda</h2>
       {/* Notifikasi: jika sudah transfer ke panitia, tampilkan ini saja */}
-      {sudahTransferKePanitia ? (
+      {setoranAwalKurang ? (
+        <div className="mb-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 flex items-center">
+            <svg className="w-6 h-6 text-yellow-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 20.5C6.201 20.5 1 15.299 1 9.5S6.201-1.5 12-1.5 23 4.701 23 10.5 17.799 20.5 12 20.5z" /></svg>
+            <div>
+              <span className="font-semibold text-yellow-800">Setoran awal Anda masih kurang dari target setoran awal. Silakan upload bukti setoran tambahan.</span>
+              <div className="text-yellow-700 text-sm mt-1">Total setoran awal disetujui: <b>{formatRupiah(totalSetoranAwal)}</b> / Target: <b>{formatRupiah(targetSetoranAwal)}</b></div>
+            </div>
+          </div>
+        </div>
+      ) : sudahTransferKePanitia ? (
         <div className="mb-4">
           <div className="bg-blue-50 border border-blue-200 rounded-md p-4 flex items-center">
             <svg className="w-6 h-6 text-blue-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M12 20.5C6.201 20.5 1 15.299 1 9.5S6.201-1.5 12-1.5 23 4.701 23 10.5 17.799 20.5 12 20.5z" /></svg>
@@ -83,8 +103,7 @@ export default function PersonalProgress({
           <div className="flex mb-2 items-center justify-between">
             <div>
               <span className="text-xs font-semibold inline-block text-gray-600">
-                Progress menuju target{" "}
-                {profile ? formatRupiah(profile.TargetPribadi || globalConfig?.TargetPribadiDefault || 0) : "Rp 0"}
+                Progress menuju target {formatRupiah(targetTotal)}
                 {globalConfig?.TanggalTargetQurban &&
                   ` (Target: ${new Date(globalConfig.TanggalTargetQurban).toLocaleDateString("id-ID", {
                     day: "numeric",
@@ -98,11 +117,9 @@ export default function PersonalProgress({
             <div
               style={{
                 width: `${
-                  profile && (profile.TargetPribadi || globalConfig?.TargetPribadiDefault) > 0
+                  targetTotal > 0
                     ? Math.min(
-                        ((personalTotalRecorded - personalUsed) /
-                          (profile.TargetPribadi || globalConfig.TargetPribadiDefault)) *
-                          100,
+                        ((personalTotalRecorded - personalUsed) / targetTotal) * 100,
                         100,
                       )
                     : 0

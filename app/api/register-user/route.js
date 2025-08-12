@@ -10,6 +10,12 @@ export async function POST(request) {
     const {
       UserId,
       Nama,
+      Nickname,
+      Provinsi,
+      Kota,
+      Pekerjaan,
+      StatusPernikahan,
+      JumlahAnak,
       NamaPequrban,
       JumlahPequrban,
       Email,
@@ -21,7 +27,7 @@ export async function POST(request) {
     } = await request.json()
 
     // Validasi data wajib
-    if (!UserId || !Nama || !NamaPequrban || !Array.isArray(NamaPequrban) || NamaPequrban.length < 1 || !JumlahPequrban || !Email || !MetodeTabungan || !Password) {
+    if (!UserId || !Nama || !Nickname || !Provinsi || !Kota || !Pekerjaan || !StatusPernikahan || (StatusPernikahan === "Sudah Menikah" && (JumlahAnak === undefined || JumlahAnak === null)) || !NamaPequrban || !Array.isArray(NamaPequrban) || NamaPequrban.length < 1 || !JumlahPequrban || !Email || !MetodeTabungan || !Password) {
       return NextResponse.json({ error: "Data yang dibutuhkan tidak lengkap atau format salah." }, { status: 400 })
     }
     if (NamaPequrban.length !== Number(JumlahPequrban)) {
@@ -56,12 +62,18 @@ export async function POST(request) {
     const verifyToken = generateToken();
     const verifyTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 jam
 
-    // TargetPribadi sudah dihitung di frontend, cukup gunakan saja
+    // TargetPribadi = nominal per pequrban, total target = TargetPribadi * JumlahPequrban
     // Insert user dengan password hash dan token verifikasi
     const { data, error: insertError } = await supabaseAdmin.from("users").insert([
       {
         UserId,
         Nama,
+        Nickname,
+        Provinsi,
+        Kota,
+        Pekerjaan,
+        StatusPernikahan,
+        JumlahAnak: StatusPernikahan === "Sudah Menikah" ? JumlahAnak : 0,
         NamaPequrban,
         JumlahPequrban,
         Email,
@@ -69,7 +81,7 @@ export async function POST(request) {
         MetodeTabungan,
         QurbanMethod: QurbanMethod || (MetodeTabungan === "Qurban di Tim" ? "Tim" : "Sendiri"),
         StatusSetoran: "Belum Setor",
-        TargetPribadi,
+        TargetPribadi, // per pequrban
         TanggalDaftar: new Date().toISOString(),
         IsInitialDepositMade: false,
         InitialDepositStatus: "Pending",

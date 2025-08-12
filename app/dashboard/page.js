@@ -73,6 +73,7 @@ function MobileDashboardTabs({
               loadingPersonal={loadingPersonal}
               formatRupiah={formatRupiah}
               getMonthDifference={getMonthDifference}
+              allPersonalTransferConfirmations={transactionProps.allPersonalTransferConfirmations}
             />
             {/* TransactionForms harus tetap dirender di mobile agar warning pelunasan pending/approved muncul */}
             {profile && (
@@ -116,14 +117,57 @@ function MobileDashboardTabs({
 
 // Komponen untuk menangani useSearchParams dengan Suspense
 function DashboardContent() {
-  // Handler untuk tombol Help Desk
-  const handleGoToHelpDesk = () => {
-    const params = new URLSearchParams(window.location.search)
-    params.set("tab", "helpdesk")
-    router.push(`/dashboard?${params.toString()}`)
-  }
-  // Fetch all news for notification bell (tanpa paging)
-  const [allNews, setAllNews] = useState([])
+  // --- All hooks at the top, unconditionally ---
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentTab = searchParams.get("tab") || "main";
+  const dashboardData = useDashboardData();
+  const {
+    user, setUser, profile, setProfile, appConfig,
+    personalTotalRecorded, setPersonalTotalRecorded, personalUsed, setPersonalUsed, personalTransferred,
+    personalSavingHistory, setPersonalSavingHistory, personalTransferConfirmations, setPersonalTransferConfirmations,
+    allPersonalTransferConfirmations, setAllPersonalTransferConfirmations, userHelpDeskTickets, setUserHelpDeskTickets, news, milestones, documents, newsPage, setNewsPage, newsTotal,
+    NEWS_PER_PAGE, loadingInitial, setLoadingInitial, loadingProfile, loadingAppConfig, loadingPersonal,
+    loadingNews, loadingMilestones, loadingHelpDeskTickets, loadingDocuments, error, setError,
+    fetchUserAndInit, fetchProfile, fetchAppConfigSection, fetchPersonalSectionData,
+    fetchNewsSection, fetchMilestonesSection, fetchHelpDeskTicketsSection, fetchResourcesSection,
+    setNews, setMilestones, setDocuments,
+  } = dashboardData;
+
+  const [kuisionerChecked, setKuisionerChecked] = useState(false);
+  const [allNews, setAllNews] = useState([]);
+  const [readNewsIds, setReadNewsIds] = useState([]);
+  const readNewsIdsRef = useRef(readNewsIds);
+  const hasInit = useRef(false);
+
+  // --- Hooks logic ---
+  useEffect(() => {
+    if (!user) {
+      fetchUserAndInit(router);
+    }
+  }, [user, fetchUserAndInit, router]);
+
+  useEffect(() => {
+    async function checkKuisioner() {
+      if (!user || !user.UserId) {
+        return;
+      }
+      try {
+        const url = `/api/kuisioner-status?user_id=${user.UserId}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (!data.filled) {
+            router.replace('/kuisioner');
+            return;
+          }
+        }
+      } catch (e) {}
+      setKuisionerChecked(true);
+    }
+    checkKuisioner();
+  }, [user, router]);
+
   useEffect(() => {
     async function fetchAllNews() {
       try {
@@ -135,55 +179,15 @@ function DashboardContent() {
       } catch {}
     }
     fetchAllNews()
-  }, [])
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const currentTab = searchParams.get("tab") || "main"
+  }, []);
 
-  // Custom hooks
-  const dashboardData = useDashboardData()
-  const {
-    user, setUser, profile, setProfile, appConfig,
-    personalTotalRecorded, setPersonalTotalRecorded, personalUsed, setPersonalUsed, personalTransferred,
-    personalSavingHistory, setPersonalSavingHistory, personalTransferConfirmations, setPersonalTransferConfirmations,
-    allPersonalTransferConfirmations, setAllPersonalTransferConfirmations, // <-- tambahkan setter
-    userHelpDeskTickets, setUserHelpDeskTickets, news, milestones, documents, newsPage, setNewsPage, newsTotal,
-    NEWS_PER_PAGE, loadingInitial, setLoadingInitial, loadingProfile, loadingAppConfig, loadingPersonal,
-    loadingNews, loadingMilestones, loadingHelpDeskTickets, loadingDocuments, error, setError,
-    fetchUserAndInit, fetchProfile, fetchAppConfigSection, fetchPersonalSectionData,
-    fetchNewsSection, fetchMilestonesSection, fetchHelpDeskTicketsSection, fetchResourcesSection,
-    setNews, setMilestones, setDocuments,
-  } = dashboardData
-
-  const dashboardActions = useDashboardActions({
-    user, profile, appConfig, personalTotalRecorded, personalUsed,
-    setPersonalSavingHistory, setPersonalTotalRecorded, setPersonalUsed, setPersonalTransferConfirmations,
-    setUserHelpDeskTickets, setProfile, formatRupiah,
-    fetchPersonalSectionData, // Pastikan diteruskan ke hook actions
-  })
-
-  const {
-    addSavingLoading, useSavingLoading, confirmTransferLoading, helpDeskFormLoading,
-    handleAddSaving, handleUseSaving, handleInitialDeposit, handleConfirmTransfer, handleHelpDeskSubmit,
-    showConfirmModal, handleEditTransaction, handleDeleteSaving, handleDeleteTransferConfirmation,
-  } = dashboardActions
-
-  // --- Notification State (like original NewsSection) ---
-  // NewsSection now manages modal and paging. Only notification state here.
-  // (already declared above, do not redeclare)
-  const [readNewsIds, setReadNewsIds] = useState([])
-
-  // Load read news from backend (manual userId)
-  // Gunakan ref agar state readNewsIds tetap up-to-date di event handler
-  const readNewsIdsRef = useRef(readNewsIds)
   useEffect(() => {
     readNewsIdsRef.current = readNewsIds
-  }, [readNewsIds])
+  }, [readNewsIds]);
 
   useEffect(() => {
     async function fetchReadNews() {
       let userId = null
-      // Try to get userId from user object (from dashboardData), fallback to localStorage
       if (user && user.id) {
         userId = user.id
       } else if (typeof window !== 'undefined') {
@@ -209,8 +213,6 @@ function DashboardContent() {
       } catch {}
     }
     fetchReadNews()
-
-    // Listen for custom event from NewsSection/modal to update readNewsIds real-time
     function handleNewsRead(e) {
       const { newsId } = e.detail || {}
       if (newsId && !readNewsIdsRef.current.includes(newsId)) {
@@ -225,72 +227,14 @@ function DashboardContent() {
         window.removeEventListener('newsRead', handleNewsRead)
       }
     }
-  }, [user])
+  }, [user]);
 
-  // Gabungkan notifikasi berita dan setoran/pelunasan dalam satu array
-  let notifications = [];
-  if (allNews && allNews.length > 0) {
-    notifications = allNews.map((item) => ({
-      title: "Berita Baru",
-      message: item.Title,
-      time: item.DatePublished,
-      read: readNewsIds.includes(item.NewsletterId),
-      action: () => {
-        // Open modal in NewsSection via custom event
-        const event = new CustomEvent("openNewsModal", { detail: item })
-        window.dispatchEvent(event)
-      },
-      actionLabel: "Read More",
-      type: "berita"
-    }));
-  }
-  // Tambahkan notifikasi setoran/pelunasan dengan type dan time
-  if (profile) {
-    if (!profile.IsInitialDepositMade) {
-      notifications.push({
-        title: "Setoran Awal",
-        message: "Anda belum melakukan setoran awal.",
-        read: false,
-        type: "setoran",
-        time: profile.InitialDepositDate || new Date().toISOString()
-      });
-    } else if (profile.InitialDepositStatus === "Pending") {
-      notifications.push({
-        title: "Setoran Awal",
-        message: "Setoran awal Anda sedang menunggu verifikasi admin.",
-        read: false,
-        type: "setoran",
-        time: profile.InitialDepositDate || new Date().toISOString()
-      });
-    } else if (profile.InitialDepositStatus === "Rejected") {
-      notifications.push({
-        title: "Setoran Awal Ditolak",
-        message: profile.InitialDepositAdminNotes ? `Alasan: ${profile.InitialDepositAdminNotes}` : "Setoran awal Anda ditolak oleh admin.",
-        read: false,
-        type: "setoran",
-        time: profile.InitialDepositDate || new Date().toISOString()
-      });
-    } else if (profile.InitialDepositStatus === "Approved") {
-      notifications.push({
-        title: "Setoran Awal Disetujui",
-        message: "Setoran awal Anda telah diverifikasi admin.",
-        read: true,
-        type: "setoran",
-        time: profile.InitialDepositVerifiedAt || profile.InitialDepositDate || new Date().toISOString()
-      });
-    }
-  }
-
-  // News modal and paging now handled in NewsSection
-  const hasInit = useRef(false)
   useEffect(() => {
     if (!hasInit.current) {
-  // Render NewsSection with only notification props
-  // <NewsSection /> should now handle its own paging, fetch, and modal
       fetchUserAndInit(router)
       hasInit.current = true
     }
-  }, [fetchUserAndInit])
+  }, [fetchUserAndInit]);
 
   useEffect(() => {
     if (user && !profile) {
@@ -299,7 +243,7 @@ function DashboardContent() {
     if (user && !appConfig) {
       fetchAppConfigSection()
     }
-  }, [user, profile, appConfig, fetchProfile, fetchAppConfigSection])
+  }, [user, profile, appConfig, fetchProfile, fetchAppConfigSection]);
 
   useEffect(() => {
     if (user && profile && appConfig) {
@@ -352,7 +296,7 @@ function DashboardContent() {
         setLoadingInitial(false)
       })
     }
-  }, [user, profile, appConfig, newsPage])
+  }, [user, profile, appConfig, newsPage]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -361,55 +305,178 @@ function DashboardContent() {
         router.push("/login")
       }
     }
-  }, [router])
+  }, [router]);
 
-  // --- Event Handlers ---
-  const handleSignOut = async () => {
-    setLoadingInitial(true)
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("qurban_user")
-      sessionStorage.clear()
+  // --- Dashboard actions ---
+  const dashboardActions = useDashboardActions({
+    user, profile, appConfig, personalTotalRecorded, personalUsed,
+    setPersonalSavingHistory, setPersonalTotalRecorded, setPersonalUsed, setPersonalTransferConfirmations,
+    setUserHelpDeskTickets, setProfile, formatRupiah,
+    fetchPersonalSectionData,
+  });
+  const {
+    addSavingLoading, useSavingLoading, confirmTransferLoading, helpDeskFormLoading,
+    handleAddSaving, handleUseSaving, handleInitialDeposit, handleConfirmTransfer, handleHelpDeskSubmit,
+    showConfirmModal, handleEditTransaction, handleDeleteSaving, handleDeleteTransferConfirmation,
+  } = dashboardActions;
+
+  // --- Handler for Help Desk tab ---
+  const handleGoToHelpDesk = () => {
+    const params = new URLSearchParams(window.location.search)
+    params.set("tab", "helpdesk")
+    router.push(`/dashboard?${params.toString()}`)
+  };
+
+  // --- Notification logic ---
+  let notifications = [];
+  if (allNews && allNews.length > 0) {
+    notifications = allNews.map((item) => ({
+      title: "Berita Baru",
+      message: item.Title,
+      time: item.DatePublished,
+      read: readNewsIds.includes(item.NewsletterId),
+      action: () => {
+        const event = new CustomEvent("openNewsModal", { detail: item })
+        window.dispatchEvent(event)
+      },
+      actionLabel: "Read More",
+      type: "berita"
+    }));
+  }
+  if (profile) {
+    if (!profile.IsInitialDepositMade) {
+      notifications.push({
+        title: "Setoran Awal",
+        message: "Anda belum melakukan setoran awal.",
+        read: false,
+        type: "setoran",
+        time: profile.InitialDepositDate || new Date().toISOString()
+      });
+    } else if (profile.InitialDepositStatus === "Pending") {
+      notifications.push({
+        title: "Setoran Awal",
+        message: "Setoran awal Anda sedang menunggu verifikasi admin.",
+        read: false,
+        type: "setoran",
+        time: profile.InitialDepositDate || new Date().toISOString()
+      });
+    } else if (profile.InitialDepositStatus === "Rejected") {
+      notifications.push({
+        title: "Setoran Awal Ditolak",
+        message: profile.InitialDepositAdminNotes ? `Alasan: ${profile.InitialDepositAdminNotes}` : "Setoran awal Anda ditolak oleh admin.",
+        read: false,
+        type: "setoran",
+        time: profile.InitialDepositDate || new Date().toISOString()
+      });
+    } else if (profile.InitialDepositStatus === "Approved") {
+      notifications.push({
+        title: "Setoran Awal Disetujui",
+        message: "Setoran awal Anda telah diverifikasi admin.",
+        read: true,
+        type: "setoran",
+        time: profile.InitialDepositVerifiedAt || profile.InitialDepositDate || new Date().toISOString()
+      });
     }
-    router.push("/login")
-    setLoadingInitial(false)
   }
 
-  const handleRefreshDashboard = useCallback(() => {
-    if (user && appConfig) {
-      fetchProfile(user.id)
-      Promise.allSettled([
-        fetchPersonalSectionData(user.id, profile, appConfig),
-        fetchNewsSection(newsPage),
-        fetchMilestonesSection(),
-        fetchHelpDeskTicketsSection(user.id),
-        fetchResourcesSection(user.id),
-      ]).then(() => {
-        const cacheKey = `dashboard-data-${user.id}`
-        sessionStorage.removeItem(cacheKey)
-      })
-    }
-  }, [
-    user, profile, appConfig, newsPage,
-    fetchProfile, fetchPersonalSectionData, fetchNewsSection,
-    fetchMilestonesSection, fetchHelpDeskTicketsSection, fetchResourcesSection,
-  ])
+  // --- Render logic ---
+  if (!kuisionerChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+      </div>
+    )
+  }
 
-  // --- Render Logic ---
-  // Tidak lagi pakai global spinner, loading per section
+  if (error) return <div className="text-center mt-10 text-red-500">Error: {error}</div>;
 
-  if (error) return <div className="text-center mt-10 text-red-500">Error: {error}</div>
+  const totalNewsPages = Math.max(1, Math.ceil(newsTotal / NEWS_PER_PAGE));
 
-  const totalNewsPages = Math.max(1, Math.ceil(newsTotal / NEWS_PER_PAGE))
+  if (profile && profile.IsInitialDepositMade && profile.InitialDepositStatus === "Pending") {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <DashboardHeader
+          profile={profile}
+          handleRefreshDashboard={dashboardActions.handleRefreshDashboard || (() => {})}
+          handleSignOut={dashboardActions.handleSignOut || (() => {})}
+          handleGoToHelpDesk={handleGoToHelpDesk}
+        />
+        <main className="max-w-2xl mx-auto py-10 px-4">
+          <ProfilePequrban profile={profile} loadingProfile={loadingProfile || loadingInitial} />
+          <div className="mt-6">
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 rounded-xl shadow-lg p-8 flex items-center">
+              <svg className="w-10 h-10 text-yellow-500 mr-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z" />
+              </svg>
+              <div>
+                <div className="font-bold text-yellow-800 text-lg mb-1">Setoran Awal berhasil dikirim</div>
+                <div className="text-yellow-700 text-base">Setoran Awal berhasil dikirim, menunggu verifikasi dari admin. Akses ke seluruh fitur akan aktif setelah setoran awal Approved oleh Admin.</div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (profile && profile.IsInitialDepositMade && profile.InitialDepositStatus === "Rejected") {
+    return (
+      <div className="min-h-screen bg-gray-100">
+        <DashboardHeader
+          profile={profile}
+          handleRefreshDashboard={dashboardActions.handleRefreshDashboard || (() => {})}
+          handleSignOut={dashboardActions.handleSignOut || (() => {})}
+          handleGoToHelpDesk={handleGoToHelpDesk}
+        />
+        <main className="max-w-2xl mx-auto py-10 px-4">
+          <ProfilePequrban profile={profile} loadingProfile={loadingProfile || loadingInitial} />
+          <div className="mt-6">
+            <div className="bg-red-50 border-l-4 border-red-400 rounded-xl shadow-lg p-8 flex items-center">
+              <svg className="w-10 h-10 text-red-500 mr-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z" />
+              </svg>
+              <div>
+                <div className="font-bold text-red-800 text-lg mb-1">Setoran Awal Ditolak</div>
+                <div className="text-red-700 text-base">Setoran awal ditolak, mohon periksa kembali bukti transfer kamu</div>
+                {profile.InitialDepositAdminNotes && (
+                  <div className="text-red-700 text-sm mt-2">Alasan: {profile.InitialDepositAdminNotes}</div>
+                )}
+              </div>
+            </div>
+            <div className="mt-6">
+              <TransactionForms
+                profile={profile}
+                appConfig={appConfig}
+                user={user}
+                personalTotalRecorded={personalTotalRecorded}
+                personalUsed={personalUsed}
+                personalSavingHistory={personalSavingHistory}
+                allPersonalTransferConfirmations={allPersonalTransferConfirmations}
+                addSavingLoading={addSavingLoading}
+                useSavingLoading={useSavingLoading}
+                confirmTransferLoading={confirmTransferLoading}
+                handleAddSaving={handleAddSaving}
+                handleUseSaving={handleUseSaving}
+                handleInitialDeposit={handleInitialDeposit}
+                handleConfirmTransfer={handleConfirmTransfer}
+                formatRupiah={formatRupiah}
+              />
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100">
       <DashboardHeader
         profile={profile}
-        handleRefreshDashboard={handleRefreshDashboard}
-        handleSignOut={handleSignOut}
+        handleRefreshDashboard={dashboardActions.handleRefreshDashboard || (() => {})}
+        handleSignOut={dashboardActions.handleSignOut || (() => {})}
         handleGoToHelpDesk={handleGoToHelpDesk}
       >
-        {profile && profile.IsInitialDepositMade && (
+        {profile && profile.IsInitialDepositMade && profile.InitialDepositStatus === "Approved" && (
           <div className="ml-2">
             <NotificationBell notifications={notifications} />
           </div>
@@ -420,20 +487,17 @@ function DashboardContent() {
           {currentTab === "helpdesk" ? (
             <HelpDeskSection
               userHelpDeskTickets={userHelpDeskTickets}
-              loadingHelpDeskTickets={loadingHelpDeskTickets || loadingInitial}
+              loadingHelpDeskTickets={loadingHelpDeskFormLoading || loadingInitial}
               helpDeskFormLoading={helpDeskFormLoading}
               handleHelpDeskSubmit={handleHelpDeskSubmit}
             />
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Section: Profile & Progress */}
               <div className={"lg:col-span-2 space-y-6"}>
-                {/* Jika user belum setoran awal, tampilkan profil dan form setoran awal saja, lebar sama, stacked */}
                 {profile && !profile.IsInitialDepositMade ? (
                   <>
                     <ProfilePequrban profile={profile} loadingProfile={loadingProfile || loadingInitial} />
                     <div className="my-4 border-t border-gray-300" />
-                    {/* Alert info setoran awal */}
                     <div className="mb-4 p-4 rounded-md bg-yellow-100 border-l-4 border-yellow-400 flex items-center">
                       <svg className="w-6 h-6 text-yellow-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z" />
@@ -442,7 +506,6 @@ function DashboardContent() {
                         Anda belum melakukan <b>setoran awal</b>. Silakan lakukan setoran awal untuk mengaktifkan seluruh fitur tabungan qurban.
                       </span>
                     </div>
-                    {/* TransactionForms hanya untuk setoran awal, tetap di sini */}
                     <TransactionForms
                       profile={profile}
                       appConfig={appConfig}
@@ -467,7 +530,6 @@ function DashboardContent() {
                 ) : (
                   <>
                     <ProfilePequrban profile={profile} loadingProfile={loadingProfile || loadingInitial} />
-                    {/* Mobile: Tab menu tetap, tapi fitur di dalamnya juga dikondisikan */}
                     <MobileDashboardTabs
                       user={user}
                       readNewsIds={readNewsIds}
@@ -513,7 +575,6 @@ function DashboardContent() {
                       documents={documents}
                       loadingDocuments={loadingDocuments}
                     />
-                    {/* Desktop: fitur-fitur lain hanya tampil jika setoran awal sudah dibuat dan approved */}
                     <div className="hidden lg:block space-y-6">
                       <PersonalProgress
                         profile={profile}
@@ -524,6 +585,7 @@ function DashboardContent() {
                         loadingPersonal={loadingPersonal || loadingInitial}
                         formatRupiah={formatRupiah}
                         getMonthDifference={getMonthDifference}
+                        allPersonalTransferConfirmations={allPersonalTransferConfirmations}
                       />
                       <MilestoneProgram milestones={milestones} loadingMilestones={loadingMilestones} />
                       <NewsSection
@@ -537,12 +599,9 @@ function DashboardContent() {
                   </>
                 )}
               </div>
-              {/* Section: Transaction & History (desktop only) */}
               <div className="hidden lg:block lg:col-span-1 space-y-6">
                 {(profile && profile.IsInitialDepositMade && profile.InitialDepositStatus === "Approved") ? (
                   <>
-                  
-                    {/* TransactionForms hanya di kolom kanan desktop setelah setoran awal approved */}
                     <TransactionForms
                       profile={profile}
                       appConfig={appConfig}
@@ -580,14 +639,12 @@ function DashboardContent() {
                   </>
                 ) : null}
               </div>
-              {/* Section: Transaction (mobile/initial deposit not made) */}
-              {/* Hapus TransactionForms di bawah, hanya tampilkan di kolom kanan jika user belum setoran awal */}
             </div>
           )}
         </div>
       </main>
     </div>
-  )
+  );
 }
 
 // Komponen utama dengan Suspense wrapper

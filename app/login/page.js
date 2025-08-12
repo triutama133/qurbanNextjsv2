@@ -93,7 +93,9 @@ export default function LoginPage() {
       }
       // Simpan user ke localStorage, tambahkan properti id
       const userWithId = { ...result.user, id: result.user.UserId };
-      localStorage.setItem("qurban_user", JSON.stringify(userWithId));
+  localStorage.setItem("qurban_user", JSON.stringify(userWithId));
+  // Simpan UserId juga ke localStorage agar fitur upload dokumen bisa mengambilnya
+  localStorage.setItem("user_id", result.user.UserId);
       // Login sukses, cek role
       if (result.user.Role === "Admin") {
         setMessage("Login admin berhasil! Mengarahkan ke dashboard admin...");

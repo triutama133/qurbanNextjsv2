@@ -17,6 +17,12 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [accountLoading, setAccountLoading] = useState(false);
+  // Pequrban Settings State
+  const [jumlahPequrban, setJumlahPequrban] = useState(1);
+  const [pequrbanNames, setPequrbanNames] = useState(['']);
+  const [pequrbanLoading, setPequrbanLoading] = useState(false);
+  const [pequrbanMessage, setPequrbanMessage] = useState('');
+  const [pequrbanMessageType, setPequrbanMessageType] = useState('');
   
   // Profile Settings State
   const [fullName, setFullName] = useState('');
@@ -50,6 +56,16 @@ export default function SettingsPage() {
         setFullName(profileData.Nama || '');
         setPequrbanName(profileData.NamaPequrban || '');
         setPhoneNumber(profileData.phone_number || '');
+        // Inisialisasi jumlah dan nama pequrban
+        const jumlah = profileData.JumlahPequrban || (Array.isArray(profileData.NamaPequrban) ? profileData.NamaPequrban.length : 1);
+        setJumlahPequrban(jumlah);
+        if (Array.isArray(profileData.NamaPequrban)) {
+          setPequrbanNames(profileData.NamaPequrban);
+        } else if (typeof profileData.NamaPequrban === 'string') {
+          setPequrbanNames([profileData.NamaPequrban]);
+        } else {
+          setPequrbanNames(['']);
+        }
       } catch (error) {
         console.error('Error:', error);
       } finally {
@@ -58,6 +74,81 @@ export default function SettingsPage() {
     }
     fetchProfile();
   }, [router]);
+
+  // Handler update pequrban
+  const handleUpdatePequrban = async (e) => {
+    e.preventDefault();
+    setPequrbanLoading(true);
+    setPequrbanMessage('');
+    setPequrbanMessageType('');
+    // Validasi jumlah pequrban minimal 1
+    if (!jumlahPequrban || jumlahPequrban < 1) {
+      setPequrbanMessage('Jumlah pequrban minimal 1.');
+      setPequrbanMessageType('error');
+      setPequrbanLoading(false);
+      return;
+    }
+    // Pastikan array nama sesuai jumlah dan semua di-trim
+    const trimmedNames = pequrbanNames.slice(0, jumlahPequrban).map((n) => n.trim());
+    if (trimmedNames.length !== jumlahPequrban || trimmedNames.some((n) => !n)) {
+      setPequrbanMessage('Semua nama pequrban harus diisi.');
+      setPequrbanMessageType('error');
+      setPequrbanLoading(false);
+      return;
+    }
+
+    // Hitung target per pequrban sesuai MetodeTabungan
+    let targetPerPequrban = 2650000; // default
+    if (profile?.MetodeTabungan === 'Qurban di Tim') {
+      targetPerPequrban = 2650000;
+    } else if (profile?.MetodeTabungan === 'Qurban Sendiri' && profile?.TargetPribadi && profile?.JumlahPequrban) {
+      // TargetPribadi custom per pequrban
+      targetPerPequrban = Math.round(Number(profile.TargetPribadi) / Number(profile.JumlahPequrban));
+    }
+    const newTargetPribadi = targetPerPequrban * jumlahPequrban;
+
+    // Setoran awal per pequrban (bisa dari config, fallback 300000)
+    const initialDepositPerPequrban = (profile?.InitialDepositAmount || 300000);
+    const requiredInitialDeposit = initialDepositPerPequrban * jumlahPequrban;
+    // Hitung total setoran awal approved user (dari transferConfirmations)
+    let userInitialDeposit = 0;
+    if (profile && Array.isArray(profile.transferConfirmations)) {
+      userInitialDeposit = profile.transferConfirmations
+        .filter(item => item.Status === "Approved" && item.Type?.toLowerCase() === "setoran awal")
+        .reduce((sum, item) => sum + (item.Amount || 0), 0);
+    }
+
+    try {
+      const payload = {
+        userId: user?.userId,
+        NamaPequrban: trimmedNames,
+        JumlahPequrban: jumlahPequrban,
+        TargetPribadi: newTargetPribadi
+      };
+      console.log('[UPDATE PEQURBAN PAYLOAD]', payload);
+      const res = await fetch('/api/settings-update-pequrban', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Gagal update pequrban');
+      setPequrbanMessage('Data pequrban & target berhasil diperbarui!');
+      setPequrbanMessageType('success');
+      setProfile((prev) => ({ ...prev, JumlahPequrban: jumlahPequrban, NamaPequrban: trimmedNames, TargetPribadi: newTargetPribadi }));
+      setPequrbanNames(trimmedNames);
+      // Setelah update, jika setoran awal kurang, beri notifikasi info (bukan blokir)
+      if (userInitialDeposit < requiredInitialDeposit) {
+        setPequrbanMessage(`Data pequrban berhasil diperbarui, namun jumlah setoran awal Anda (${userInitialDeposit.toLocaleString('id-ID')}) kurang dari yang seharusnya (${requiredInitialDeposit.toLocaleString('id-ID')}). Silakan lakukan setoran awal tambahan.`);
+        setPequrbanMessageType('error');
+      }
+    } catch (error) {
+      setPequrbanMessage('Gagal memperbarui data pequrban: ' + error.message);
+      setPequrbanMessageType('error');
+    } finally {
+      setPequrbanLoading(false);
+    }
+  };
 
   const handleUpdateEmail = async (e) => {
     e.preventDefault();
@@ -332,59 +423,121 @@ export default function SettingsPage() {
 
           {/* Profile Settings Tab */}
           {activeTab === 'profile' && (
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Ubah Informasi Profil</h3>
-              <form onSubmit={handleUpdateProfile} className="space-y-4">
-                <div>
-                  <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
-                    Nama Lengkap Pemilik Akun
-                  </label>
-                  <input
-                    type="text"
-                    id="fullName"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    required
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="pequrbanName" className="block text-sm font-medium text-gray-700">
-                    Nama Pequrban (Qurban atas nama)
-                  </label>
-                  <input
-                    type="text"
-                    id="pequrbanName"
-                    value={pequrbanName}
-                    onChange={(e) => setPequrbanName(e.target.value)}
-                    required
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
-                    Nomor HP
-                  </label>
-                  <input
-                    type="tel"
-                    id="phoneNumber"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9+]/g, ""))}
-                    required
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
-                    placeholder="08xxxxxxxxxx"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={profileLoading}
-                  className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 font-medium"
-                >
-                  {profileLoading ? 'Memperbarui...' : 'Perbarui Profil'}
-                </button>
-              </form>
-              <p id="profileMessage" className="text-sm mt-3"></p>
-            </div>
+            <>
+              <div className="bg-white p-6 rounded-xl shadow-lg mb-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Ubah Data Pequrban</h3>
+                <form onSubmit={handleUpdatePequrban} className="space-y-4">
+                  <div>
+                    <label htmlFor="jumlah-pequrban" className="block text-sm font-medium text-gray-700 mb-1">
+                      Jumlah Pequrban
+                    </label>
+                    <input
+                      id="jumlah-pequrban"
+                      name="jumlah-pequrban"
+                      type="number"
+                      min={1}
+                      max={10}
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                      value={jumlahPequrban === 0 ? '' : jumlahPequrban}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (raw === '') {
+                          setJumlahPequrban(0);
+                          setPequrbanNames([]);
+                          return;
+                        }
+                        let val = Number(raw);
+                        if (isNaN(val)) val = 0;
+                        if (val > 10) val = 10;
+                        setJumlahPequrban(val);
+                        setPequrbanNames((prev) => {
+                          const arr = [...prev];
+                          if (val > arr.length) {
+                            for (let i = arr.length; i < val; i++) arr.push('');
+                          } else if (val < arr.length) {
+                            arr.length = val;
+                          }
+                          return arr;
+                        });
+                      }}
+                    />
+                  </div>
+                  {/* Nama-nama Pequrban */}
+                  {pequrbanNames.map((name, idx) => (
+                    <div key={idx}>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Nama Pequrban #{idx + 1}
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                        placeholder={`Masukkan nama pequrban ke-${idx + 1}`}
+                        value={name}
+                        onChange={(e) => {
+                          const arr = [...pequrbanNames];
+                          arr[idx] = e.target.value;
+                          setPequrbanNames(arr);
+                        }}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="submit"
+                    disabled={pequrbanLoading}
+                    className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 font-medium"
+                  >
+                    {pequrbanLoading ? 'Memperbarui...' : 'Perbarui Data Pequrban'}
+                  </button>
+                </form>
+                {pequrbanMessage && (
+                  <div className={`py-2 px-3 rounded-md text-sm mt-2 ${pequrbanMessageType === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                    {pequrbanMessage}
+                  </div>
+                )}
+              </div>
+              <div className="bg-white p-6 rounded-xl shadow-lg">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Ubah Informasi Profil</h3>
+                <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  <div>
+                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+                      Nama Lengkap Pemilik Akun
+                    </label>
+                    <input
+                      type="text"
+                      id="fullName"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      required
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
+                      Nomor HP
+                    </label>
+                    <input
+                      type="tel"
+                      id="phoneNumber"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9+]/g, ""))}
+                      required
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                      placeholder="08xxxxxxxxxx"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={profileLoading}
+                    className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 font-medium"
+                  >
+                    {profileLoading ? 'Memperbarui...' : 'Perbarui Profil'}
+                  </button>
+                </form>
+                <p id="profileMessage" className="text-sm mt-3"></p>
+              </div>
+            </>
           )}
         </div>
       </main>

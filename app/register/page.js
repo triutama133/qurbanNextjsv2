@@ -17,6 +17,12 @@ export default function RegisterPage() {
   const [message, setMessage] = useState("")
   const [messageType, setMessageType] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
+  const [nickname, setNickname] = useState("")
+  const [province, setProvince] = useState("")
+  const [city, setCity] = useState("")
+  const [job, setJob] = useState("")
+  const [maritalStatus, setMaritalStatus] = useState("")
+  const [childrenCount, setChildrenCount] = useState("")
   const router = useRouter()
 
   const formatRupiah = (amount) => {
@@ -38,37 +44,47 @@ export default function RegisterPage() {
     setMessage("")
     setMessageType("")
 
-    // Validasi jumlah pequrban minimal 1
+
+    // Validasi field baru
+    if (!fullName.trim()) {
+      setMessage("Nama lengkap wajib diisi."); setMessageType("error"); setLoading(false); return;
+    }
+    if (!nickname.trim()) {
+      setMessage("Nama panggilan wajib diisi."); setMessageType("error"); setLoading(false); return;
+    }
+    if (!phoneNumber.trim()) {
+      setMessage("No WA Aktif wajib diisi."); setMessageType("error"); setLoading(false); return;
+    }
+    if (!province.trim()) {
+      setMessage("Provinsi domisili wajib diisi."); setMessageType("error"); setLoading(false); return;
+    }
+    if (!city.trim()) {
+      setMessage("Kota domisili wajib diisi."); setMessageType("error"); setLoading(false); return;
+    }
+    if (!job.trim()) {
+      setMessage("Pekerjaan wajib diisi."); setMessageType("error"); setLoading(false); return;
+    }
+    if (!maritalStatus.trim()) {
+      setMessage("Status pernikahan wajib diisi."); setMessageType("error"); setLoading(false); return;
+    }
+    if (maritalStatus === "Sudah Menikah" && (!childrenCount || isNaN(childrenCount) || Number(childrenCount) < 0)) {
+      setMessage("Jumlah anak wajib diisi dan tidak boleh negatif."); setMessageType("error"); setLoading(false); return;
+    }
     if (!jumlahPequrban || jumlahPequrban < 1) {
-      setMessage("Jumlah pequrban minimal 1.")
-      setMessageType("error")
-      setLoading(false)
-      return
+      setMessage("Jumlah pequrban minimal 1."); setMessageType("error"); setLoading(false); return;
     }
-    // Validasi nama pequrban
     if (pequrbanNames.length !== jumlahPequrban || pequrbanNames.some((n) => !n.trim())) {
-      setMessage("Semua nama pequrban harus diisi.")
-      setMessageType("error")
-      setLoading(false)
-      return
+      setMessage("Semua nama pequrban harus diisi."); setMessageType("error"); setLoading(false); return;
     }
-
     if (password !== confirmPassword) {
-      setMessage("Password dan konfirmasi password tidak cocok.")
-      setMessageType("error")
-      setLoading(false)
-      return
+      setMessage("Password dan konfirmasi password tidak cocok."); setMessageType("error"); setLoading(false); return;
     }
-
     // Validasi target custom jika qurban sendiri
     let targetPerPequrban = 2650000 // Default untuk Qurban di Tim
     if (metodeTabungan === "Qurban Sendiri") {
       const customAmount = Number.parseInt(customTarget.replace(/[^0-9]/g, ""))
       if (!customAmount || customAmount < 500000) {
-        setMessage("Target tabungan minimal Rp 500.000 per pequrban untuk Qurban Sendiri.")
-        setMessageType("error")
-        setLoading(false)
-        return
+        setMessage("Target tabungan minimal Rp 500.000 per pequrban untuk Qurban Sendiri."); setMessageType("error"); setLoading(false); return;
       }
       targetPerPequrban = customAmount
     }
@@ -81,12 +97,18 @@ export default function RegisterPage() {
     console.log("Payload:", {
       UserId: userId,
       Nama: fullName,
+      Nickname: nickname,
+      phone_number: phoneNumber,
+      Provinsi: province,
+      Kota: city,
+      Pekerjaan: job,
+      StatusPernikahan: maritalStatus,
+      JumlahAnak: maritalStatus === "Sudah Menikah" ? childrenCount : 0,
       NamaPequrban: pequrbanNames,
       JumlahPequrban: jumlahPequrban,
-      phone_number: phoneNumber,
       Email: email,
       MetodeTabungan: metodeTabungan,
-      TargetPribadi: totalTarget,
+      TargetPribadi: targetPerPequrban,
     })
     const response = await fetch("/api/register-user", {
       method: "POST",
@@ -96,12 +118,18 @@ export default function RegisterPage() {
       body: JSON.stringify({
         UserId: userId,
         Nama: fullName,
+        Nickname: nickname,
+        phone_number: phoneNumber,
+        Provinsi: province,
+        Kota: city,
+        Pekerjaan: job,
+        StatusPernikahan: maritalStatus,
+        JumlahAnak: maritalStatus === "Sudah Menikah" ? childrenCount : 0,
         NamaPequrban: pequrbanNames,
         JumlahPequrban: jumlahPequrban,
-        phone_number: phoneNumber,
         Email: email,
         MetodeTabungan: metodeTabungan,
-        TargetPribadi: totalTarget,
+        TargetPribadi: targetPerPequrban,
         Password: password,
       }),
     })
@@ -155,6 +183,108 @@ export default function RegisterPage() {
                 onChange={(e) => setFullName(e.target.value)}
               />
             </div>
+            {/* Nama panggilan */}
+            <div>
+              <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-1">
+                Nama Panggilan Pemilik Akun
+              </label>
+              <input
+                id="nickname"
+                name="nickname"
+                type="text"
+                required
+                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="Masukkan nama panggilan Anda"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+              />
+            </div>
+            {/* Provinsi Domisili */}
+            <div>
+              <label htmlFor="province" className="block text-sm font-medium text-gray-700 mb-1">
+                Provinsi Domisili
+              </label>
+              <input
+                id="province"
+                name="province"
+                type="text"
+                required
+                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="Masukkan provinsi domisili"
+                value={province}
+                onChange={(e) => setProvince(e.target.value)}
+              />
+            </div>
+            {/* Kota Domisili */}
+            <div>
+              <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                Kota Domisili
+              </label>
+              <input
+                id="city"
+                name="city"
+                type="text"
+                required
+                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="Masukkan kota domisili"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+              />
+            </div>
+            {/* Pekerjaan */}
+            <div>
+              <label htmlFor="job" className="block text-sm font-medium text-gray-700 mb-1">
+                Pekerjaan
+              </label>
+              <input
+                id="job"
+                name="job"
+                type="text"
+                required
+                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="Masukkan pekerjaan"
+                value={job}
+                onChange={(e) => setJob(e.target.value)}
+              />
+            </div>
+            {/* Status Pernikahan */}
+            <div>
+              <label htmlFor="marital-status" className="block text-sm font-medium text-gray-700 mb-1">
+                Status Pernikahan
+              </label>
+              <select
+                id="marital-status"
+                name="marital-status"
+                required
+                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                value={maritalStatus}
+                onChange={(e) => setMaritalStatus(e.target.value)}
+              >
+                <option value="" disabled>Status Pernikahan</option>
+                <option value="Belum Menikah">Belum Menikah</option>
+                <option value="Sudah Menikah">Sudah Menikah</option>
+              </select>
+            </div>
+            {/* Jumlah Anak (jika sudah menikah) */}
+            {maritalStatus === "Sudah Menikah" && (
+              <div>
+                <label htmlFor="children-count" className="block text-sm font-medium text-gray-700 mb-1">
+                  Jumlah Anak
+                </label>
+                <input
+                  id="children-count"
+                  name="children-count"
+                  type="number"
+                  min={0}
+                  required
+                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  placeholder="Masukkan jumlah anak"
+                  value={childrenCount}
+                  onChange={(e) => setChildrenCount(e.target.value)}
+                />
+              </div>
+            )}
+
             {/* Jumlah Pequrban */}
             <div>
               <label htmlFor="jumlah-pequrban" className="block text-sm font-medium text-gray-700 mb-1">
@@ -230,7 +360,7 @@ export default function RegisterPage() {
             </div>
             <div>
               <label htmlFor="phone-number" className="block text-sm font-medium text-gray-700 mb-1">
-                Nomor HP
+                Nomor WA Aktif
               </label>
               <input
                 id="phone-number"
@@ -258,7 +388,7 @@ export default function RegisterPage() {
                     onChange={(e) => setMetodeTabungan(e.target.value)}
                     className="mr-2"
                   />
-                  <span className="text-sm text-gray-700">Qurban di Tim (Target: {formatRupiah(2650000)} x {jumlahPequrban} = {formatRupiah(2650000 * jumlahPequrban)})</span>
+                  <span className="text-sm text-gray-700">Qurban di Tim (Target per pequrban: {formatRupiah(2650000)}, Total: {formatRupiah(2650000 * jumlahPequrban)})</span>
                 </label>
                 <label className="flex items-center">
                   <input
@@ -296,6 +426,7 @@ export default function RegisterPage() {
                 />
                 {customTarget && (
                   <p className="text-xs text-gray-500 mt-1">
+                    Target per pequrban: {formatRupiah(Number.parseInt(customTarget.replace(/[^0-9]/g, "")) || 0)}<br />
                     Total target: {formatRupiah((Number.parseInt(customTarget.replace(/[^0-9]/g, "")) || 0) * jumlahPequrban)}<br />
                     Rekomendasi tabungan per bulan: {formatRupiah(
                       calculateMonthlyRecommendation((Number.parseInt(customTarget.replace(/[^0-9]/g, "")) || 0) * jumlahPequrban)

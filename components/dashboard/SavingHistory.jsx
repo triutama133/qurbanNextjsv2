@@ -75,8 +75,8 @@ export default function SavingHistory({
   })
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-lg">
-      <h3 className="text-lg font-bold text-gray-900 mb-2">Riwayat Tabungan Tercatat</h3>
+    <div className="bg-white p-6 rounded-xl shadow-lg text-black">
+      <h3 className="text-lg font-bold text-black mb-2">Riwayat Tabungan Tercatat</h3>
       {loadingPersonal ? (
         <ListSkeleton />
       ) : (
@@ -98,6 +98,20 @@ export default function SavingHistory({
                       {item.Tipe}
                     </span>
                   </p>
+                  {/* Status verifikasi khusus Setoran Awal, hanya dari VerificationStatus */}
+                  {item.Metode === "Setoran Awal" && item.VerificationStatus && (
+                    <p className={`text-xs font-semibold mt-1 ${
+                      item.VerificationStatus === "Approved"
+                        ? "text-green-600"
+                        : item.VerificationStatus === "Pending"
+                        ? "text-yellow-600"
+                        : item.VerificationStatus === "Rejected"
+                        ? "text-red-600"
+                        : "text-gray-600"
+                    }`}>
+                      Status: {item.VerificationStatus}
+                    </p>
+                  )}
                   <p className="text-xs text-gray-500">
                     {new Date(item.Tanggal).toLocaleDateString("id-ID")} - {item.Metode || "Tidak Ada Metode"}
                   </p>

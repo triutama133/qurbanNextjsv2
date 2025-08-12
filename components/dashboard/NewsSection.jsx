@@ -75,9 +75,9 @@ export default function NewsSection({ userId, readNewsIds, setReadNewsIds }) {
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg">
+    <div className="bg-white rounded-xl shadow-lg text-black">
       <div className="p-6">
-        <h2 className="text-xl font-bold mb-4 text-gray-800">Berita & Informasi Terbaru</h2>
+        <h2 className="text-xl font-bold mb-4 text-black">Berita & Informasi Terbaru</h2>
         {loadingNews ? (
           <ListSkeleton />
         ) : (
@@ -85,7 +85,7 @@ export default function NewsSection({ userId, readNewsIds, setReadNewsIds }) {
             {allNews.length > 0 ? (
               <>
                 {pagedNews.map((item) => (
-                  <article key={item.NewsletterId} className="border-t border-gray-200 pt-4 first:border-t-0 first:pt-0">
+                  <article key={item.NewsletterId} className="border-t border-gray-200 pt-4 first:border-t-0 first:pt-0 text-black">
                     {item.FotoLinks && item.FotoLinks.length > 0 && (
                       <Image
                         src={item.FotoLinks[0] || "/placeholder.svg?height=160&width=400"}
@@ -95,8 +95,8 @@ export default function NewsSection({ userId, readNewsIds, setReadNewsIds }) {
                         className="w-full h-40 object-cover rounded-md mb-2"
                       />
                     )}
-                    <h3 className="text-lg font-semibold text-gray-900">{item.Title}</h3>
-                    <p className="text-xs text-gray-500 mb-2">
+                    <h3 className="text-lg font-semibold text-black">{item.Title}</h3>
+                    <p className="text-xs text-black mb-2">
                       Oleh {item.AuthorName} -{" "}
                       {new Date(item.DatePublished).toLocaleDateString("id-ID", {
                         day: "numeric",
@@ -104,7 +104,7 @@ export default function NewsSection({ userId, readNewsIds, setReadNewsIds }) {
                         year: "numeric",
                       })}
                     </p>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-black">
                       {item.Content.substring(0, 150)}
                       {item.Content.length > 150 ? "..." : ""}
                     </div>
@@ -139,22 +139,22 @@ export default function NewsSection({ userId, readNewsIds, setReadNewsIds }) {
                 )}
               </>
             ) : (
-              <p className="text-gray-500 text-sm">Belum ada berita terbaru.</p>
+              <p className="text-black text-sm">Belum ada berita terbaru.</p>
             )}
           </div>
         )}
       </div>
       {/* News Modal */}
       <Dialog open={modalOpen} onOpenChange={(open) => !open && closeNewsModal()}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-white text-black [&_[data-slot=dialog-close]]:text-black">
           <DialogHeader>
-            <DialogTitle>Detail Berita</DialogTitle>
+        <DialogTitle className="text-black">Detail Berita</DialogTitle>
           </DialogHeader>
           {selectedNews && (
-            <div className="space-y-4">
+            <div className="space-y-4 text-black">
               <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedNews.Title}</h3>
-                <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
+                <h3 className="text-xl font-bold text-black mb-2">{selectedNews.Title}</h3>
+                <div className="flex items-center gap-4 text-sm text-black mb-4">
                   <div className="flex items-center gap-1">
                     <span>{selectedNews.AuthorName}</span>
                   </div>
@@ -165,13 +165,13 @@ export default function NewsSection({ userId, readNewsIds, setReadNewsIds }) {
               </div>
               {selectedNews.Summary && (
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-gray-900 mb-2">Ringkasan</h4>
-                  <p className="text-sm text-gray-700">{selectedNews.Summary}</p>
+                  <h4 className="font-medium text-black mb-2">Ringkasan</h4>
+                  <p className="text-sm text-black">{selectedNews.Summary}</p>
                 </div>
               )}
               <div>
-                <h4 className="font-medium text-gray-900 mb-2">Konten</h4>
-                <div className="prose max-w-none text-sm text-gray-700 whitespace-pre-wrap">{selectedNews.Content}</div>
+                <h4 className="font-medium text-black mb-2">Konten</h4>
+                <div className="prose max-w-none text-sm text-black whitespace-pre-wrap">{selectedNews.Content}</div>
               </div>
             </div>
           )}

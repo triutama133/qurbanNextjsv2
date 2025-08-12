@@ -47,12 +47,20 @@ export default function TransactionForms({
   // State for success notifications
   const [showSavingSuccess, setShowSavingSuccess] = React.useState(false);
   const [showUsedSuccess, setShowUsedSuccess] = React.useState(false);
+
   // --- LOGIKA DAN STATE ---
-  const isInitialDepositMade = profile?.IsInitialDepositMade
-  const jumlahPequrban = Number(profile?.JumlahPequrban) || 1
-  const initialDepositPerPequrban = appConfig?.InitialDepositAmount || 300000
-  const initialDeposit = initialDepositPerPequrban * jumlahPequrban
-  const minimumPelunasan = Math.max(0, (profile?.TargetPribadi || 2650000) - initialDeposit)
+  const isInitialDepositMade = profile?.IsInitialDepositMade;
+  const initialDepositStatus = profile?.InitialDepositStatus;
+  const jumlahPequrban = Number(profile?.JumlahPequrban) || 1;
+  const initialDepositPerPequrban = appConfig?.InitialDepositAmount || 300000;
+  // Total setoran awal = semua transfer_confirmation Type 'Setoran Awal' yang Approved
+  const totalSetoranAwal = (allPersonalTransferConfirmations || [])
+    .filter(item => (item.Type || '').toLowerCase() === 'setoran awal' && item.Status === 'Approved')
+    .reduce((sum, item) => sum + (item.Amount || 0), 0);
+  const initialDeposit = initialDepositPerPequrban * jumlahPequrban;
+  const targetPribadi = profile?.TargetPribadi || 2650000;
+  const targetTotal = targetPribadi * jumlahPequrban;
+  const minimumPelunasan = Math.max(0, targetTotal - totalSetoranAwal);
 
   // Pelunasan: hanya data transfer_confirmation dengan Type bukan 'Setoran Awal', urutkan DESC by Timestamp
   const pelunasanList = (allPersonalTransferConfirmations || [])
@@ -63,13 +71,10 @@ export default function TransactionForms({
   const pelunasanApproved = lastPelunasan?.Status === "Approved";
   const pelunasanRejected = lastPelunasan?.Status === "Rejected";
   const isQurbanSendiri = profile?.MetodeTabungan === 'Qurban Sendiri';
-  const targetPribadi = profile?.TargetPribadi || 2650000;
   const currentNetSaving = personalTotalRecorded - personalUsed;
   const sudahLunas = (() => {
     const totalPelunasanApproved = pelunasanList.filter(item => item.Status === "Approved").reduce((sum, item) => sum + (item.Amount || 0), 0);
-    const totalSetoranAwal = profile?.IsInitialDepositMade && profile?.InitialDepositStatus === "Approved" ? (appConfig?.InitialDepositAmount || 300000) : 0;
-    const targetPelunasan = targetPribadi;
-    return (totalPelunasanApproved + totalSetoranAwal) >= targetPelunasan;
+    return (totalPelunasanApproved + totalSetoranAwal) >= targetTotal;
   })();
 
   // State untuk transfer
@@ -114,19 +119,110 @@ export default function TransactionForms({
     }
   };
 
+  // Helper: form SETORAN AWAL (reusable: awal & reupload saat Rejected)
+  function renderInitialDepositForm({ isResubmission = false } = {}) {
+    return (
+      <div className="mb-4">
+        <div className="bg-white rounded-xl shadow-lg p-6 text-black">
+          <h4 className="font-semibold text-md text-gray-800 mb-2">
+            {isResubmission ? "Upload Ulang Setoran Awal" : "Setoran Awal Wajib"}
+          </h4>
+          <div className="text-sm text-gray-600 mb-2">
+            <span>Jumlah pequrban: <span className="font-semibold">{jumlahPequrban}</span></span><br />
+            <span>Nominal setoran awal per pequrban: <span className="font-semibold">{formatRupiah(initialDepositPerPequrban)}</span></span><br />
+            <span className="block mt-1">Total setoran awal wajib: <span className="font-bold text-green-700">{formatRupiah(initialDeposit)}</span></span>
+            <span className="block mt-1">Target total: <span className="font-bold text-blue-700">{formatRupiah(targetTotal)}</span></span>
+            <span className="block text-xs text-black font-semibold mt-2 mb-1">Nomor Rekening Panitia:</span>
+
+            <div className="flex flex-col gap-2 mb-2">
+              <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col items-start">
+                <span className="font-bold text-sm mb-1">CIMB Niaga Syariah</span>
+                <span className="inline-flex items-center gap-1 text-base font-mono mb-1 text-black">
+                  7639 7360 6700
+                  <button
+                    type="button"
+                    className="ml-1 px-1 py-0.5 text-xs bg-gray-100 rounded hover:bg-green-200 flex items-center border border-gray-300"
+                    onClick={() => handleCopy("7639 7360 6700")}
+                    title="Copy rekening tanpa spasi"
+                  >
+                    <Copy size={13} className="mr-0.5" />Copy
+                  </button>
+                </span>
+                <span className="italic text-xs text-black">Muhammad Andika Widiansyah Putra</span>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col items-start">
+                <span className="font-bold text-sm mb-1">Bank Jago Syariah</span>
+                <span className="inline-flex items-center gap-1 text-base font-mono mb-1 text-black">
+                  5048 8773 2512
+                  <button
+                    type="button"
+                    className="ml-1 px-1 py-0.5 text-xs bg-gray-100 rounded hover:bg-green-200 flex items-center border border-gray-300"
+                    onClick={() => handleCopy("5048 8773 2512")}
+                    title="Copy rekening tanpa spasi"
+                  >
+                    <Copy size={13} className="mr-0.5" />Copy
+                  </button>
+                </span>
+                <span className="italic text-xs text-black">Muhammad Andika Widiansyah Putra</span>
+              </div>
+              <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col items-start">
+                <span className="font-bold text-sm mb-1">Bank Syariah Indonesia</span>
+                <span className="inline-flex items-center gap-1 text-base font-mono mb-1 text-black">
+                  665 6664 180
+                  <button
+                    type="button"
+                    className="ml-1 px-1 py-0.5 text-xs bg-gray-100 rounded hover:bg-green-200 flex items-center border border-gray-300"
+                    onClick={() => handleCopy("665 6664 180")}
+                    title="Copy rekening tanpa spasi"
+                  >
+                    <Copy size={13} className="mr-0.5" />Copy
+                  </button>
+                </span>
+                <span className="italic text-xs text-black">Muhammad Andika Widiansyah Putra</span>
+              </div>
+            </div>
+          </div>
+
+          <form className="space-y-4" onSubmit={handleInitialDeposit}>
+            <div>
+              <label htmlFor="initialProofFile" className="block text-sm font-medium text-gray-700">
+                Bukti Transfer (Wajib)
+                <span className="block text-xs text-red-600 mt-1">Hanya file gambar (jpg, jpeg, png, webp) dan PDF yang diperbolehkan.</span>
+              </label>
+              <input
+                type="file"
+                id="initialProofFile"
+                required
+                accept="image/*,application/pdf"
+                className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm font-medium"
+            >
+              {isResubmission ? "Kirim Ulang Setoran Awal" : "Kirim Setoran Awal"}
+            </button>
+          </form>
+          <p id="initialMessage" className="text-sm mt-3"></p>
+        </div>
+      </div>
+    );
+  }
+
   // Helper: render form transfer pelunasan
   function renderTransferForm() {
     return (
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-4">
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-4 text-black">
         <h4 className="font-semibold text-md text-gray-800 mb-2">Konfirmasi Transfer Dana ke Panitia Qurban</h4>
         <p className="text-sm text-gray-600 mb-2">
           Unggah bukti transfer dana yang sudah Anda kirim ke rekening panitia.
         </p>
-        <span className="block text-[11px] text-gray-500 font-semibold mt-2 mb-1">Nomor Rekening Panitia (klik untuk copy):</span>
+  <span className="block text-[11px] text-black font-semibold mt-2 mb-1">Nomor Rekening Panitia (klik untuk copy):</span>
         <div className="flex flex-col gap-1 mb-6">
           <div className="bg-gray-100 border border-gray-200 rounded-md px-3 py-2 flex flex-col items-start">
             <span className="font-semibold text-xs mb-0.5">CIMB Niaga Syariah</span>
-            <span className="inline-flex items-center gap-1 text-sm font-mono mb-0.5">
+            <span className="inline-flex items-center gap-1 text-sm font-mono mb-0.5 text-black">
               7639 7360 6700
               <button
                 type="button"
@@ -137,11 +233,11 @@ export default function TransactionForms({
                 <Copy size={11} className="mr-0.5" />Copy
               </button>
             </span>
-            <span className="italic text-[10px] text-gray-500">Muhammad Andika Widiansyah Putra</span>
+            <span className="italic text-[10px] text-black">Muhammad Andika Widiansyah Putra</span>
           </div>
           <div className="bg-gray-100 border border-gray-200 rounded-md px-3 py-2 flex flex-col items-start">
             <span className="font-semibold text-xs mb-0.5">Bank Jago Syariah</span>
-            <span className="inline-flex items-center gap-1 text-sm font-mono mb-0.5">
+            <span className="inline-flex items-center gap-1 text-sm font-mono mb-0.5 text-black">
               5048 8773 2512
               <button
                 type="button"
@@ -152,11 +248,11 @@ export default function TransactionForms({
                 <Copy size={11} className="mr-0.5" />Copy
               </button>
             </span>
-            <span className="italic text-[10px] text-gray-500">Muhammad Andika Widiansyah Putra</span>
+            <span className="italic text-[10px] text-black">Muhammad Andika Widiansyah Putra</span>
           </div>
           <div className="bg-gray-100 border border-gray-200 rounded-md px-3 py-2 flex flex-col items-start">
             <span className="font-semibold text-xs mb-0.5">Bank Syariah Indonesia</span>
-            <span className="inline-flex items-center gap-1 text-sm font-mono mb-0.5">
+            <span className="inline-flex items-center gap-1 text-sm font-mono mb-0.5 text-black">
               665 6664 180
               <button
                 type="button"
@@ -167,17 +263,18 @@ export default function TransactionForms({
                 <Copy size={11} className="mr-0.5" />Copy
               </button>
             </span>
-            <span className="italic text-[10px] text-gray-500">Muhammad Andika Widiansyah Putra</span>
+            <span className="italic text-[10px] text-black">Muhammad Andika Widiansyah Putra</span>
           </div>
         </div>
         <span className="text-xs text-gray-500 block">
           Jumlah pequrban: <span className="font-bold">{jumlahPequrban}</span><br />
-          Target per pequrban: <span className="font-bold">{formatRupiah((profile?.TargetPribadi || 2650000) / jumlahPequrban)}</span><br />
+          Target per pequrban: <span className="font-bold">{formatRupiah(targetPribadi)}</span><br />
+          Target total: <span className="font-bold">{formatRupiah(targetTotal)}</span><br />
           Minimal transfer pelunasan: <span className="font-bold text-green-700">{formatRupiah(minimumPelunasan)}</span>
           <br />
-          (Target pelunasan: {formatRupiah(profile?.TargetPribadi || 2650000)} - Setoran awal: {formatRupiah(initialDeposit)})
+          (Target pelunasan: {formatRupiah(targetTotal)} - Setoran awal: {formatRupiah(totalSetoranAwal)})
         </span>
-       
+
         <form
           className="space-y-4"
           onSubmit={async e => {
@@ -260,13 +357,74 @@ export default function TransactionForms({
     );
   }
 
-  // --- RENDER ---
+  // -------------------------------------------------
+  // EARLY RETURNS untuk status Setoran Awal
+  // -------------------------------------------------
+
+  // 4) Jika BELUM PERNAH setoran awal → tampilkan form setoran awal (kondisi awal)
+  if (profile && !isInitialDepositMade && appConfig) {
+    return (
+      <>
+        {renderInitialDepositForm({ isResubmission: false })}
+      </>
+    );
+  }
+
+  // Jika totalSetoranAwal < targetSetoranAwal, wajib upload tambahan
+  const targetSetoranAwal = initialDepositPerPequrban * jumlahPequrban;
+  if (profile && isInitialDepositMade && initialDepositStatus === "Approved" && totalSetoranAwal < targetSetoranAwal) {
+    return (
+      <>
+        <div className="mb-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+            <h4 className="font-semibold text-md text-yellow-800 mb-1">Setoran Awal Kurang</h4>
+            <p className="text-yellow-700">Jumlah setoran awal yang sudah disetujui masih kurang dari target setoran awal. Silakan upload bukti setoran tambahan.</p>
+            <p className="text-yellow-700 mt-2">Total setoran awal disetujui: <b>{formatRupiah(totalSetoranAwal)}</b> / Target: <b>{formatRupiah(targetSetoranAwal)}</b></p>
+          </div>
+        </div>
+        {renderInitialDepositForm({ isResubmission: false })}
+      </>
+    );
+  }
+
+  // 5a) Jika SUDAH upload setoran awal tapi masih PENDING → satu kartu kuning & hentikan render lainnya
+  if (profile && isInitialDepositMade && initialDepositStatus === "Pending") {
+    return (
+      <>
+        <div className="mb-4">
+          <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+              <h3 className="text-sm font-semibold text-yellow-800">Menunggu Verifikasi</h3>
+              <p className="text-yellow-700 mt-1">
+                <strong>Setoran Awal berhasil dikirim, menunggu verifikasi dari admin.</strong><br />
+                Akses ke seluruh fitur akan aktif setelah setoran awal <strong>Approved</strong> oleh Admin.
+              </p>
+              <p className="text-yellow-700 mt-1">
+                Status: <span className="font-semibold">{initialDepositStatus}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // 5b) Jika SUDAH upload setoran awal dan REJECTED → satu kartu merah + tampilkan kembali form setoran awal, hentikan render lainnya
+  if (profile && isInitialDepositMade && initialDepositStatus === "Rejected") {
+    return (
+      <>
+
+        {renderInitialDepositForm({ isResubmission: true })}
+      </>
+    );
+  }
+
+  // --- RENDER NORMAL (hanya ketika InitialDepositStatus === "Approved") ---
 
   // Hide all tabungan forms if ada pelunasan pending/approved
   // Hide pelunasan/konfirmasi transfer form if belum capai target
   const hideTabunganForms = !!(lastPelunasan && (lastPelunasan.Status === "Pending" || lastPelunasan.Status === "Approved"));
-  const hidePelunasanFormBecauseNotReached = currentNetSaving < targetPribadi;
-
+  const hidePelunasanFormBecauseNotReached = currentNetSaving < targetTotal;
 
   return (
     <>
@@ -276,7 +434,7 @@ export default function TransactionForms({
       </div>
 
       {/* 1. Jika sudah pernah transfer pelunasan, tampilkan warning/pesan sesuai status terakhir */}
-      {profile && isInitialDepositMade && profile?.InitialDepositStatus === "Approved" && !isQurbanSendiri && lastPelunasan ? (
+      {profile && isInitialDepositMade && initialDepositStatus === "Approved" && !isQurbanSendiri && lastPelunasan ? (
         lastPelunasan.Status === "Pending" ? (
           <div className="mb-4">
             <div className="bg-white rounded-xl shadow-lg p-6">
@@ -313,154 +471,25 @@ export default function TransactionForms({
 
       {/* 2. Jika belum pernah transfer pelunasan, cek syarat saldo cukup untuk tampilkan form upload pelunasan */}
       {/* Hanya tampilkan form pelunasan jika sudah capai target */}
-      {profile && isInitialDepositMade && profile?.InitialDepositStatus === "Approved" && !isQurbanSendiri && !lastPelunasan && !hidePelunasanFormBecauseNotReached && (
+      {profile && isInitialDepositMade && initialDepositStatus === "Approved" && !isQurbanSendiri && !lastPelunasan && !hidePelunasanFormBecauseNotReached && (
         <div className="mb-4">
           {renderTransferForm()}
         </div>
       )}
       {/* Jika belum capai target, tampilkan info */}
-      {profile && isInitialDepositMade && profile?.InitialDepositStatus === "Approved" && !isQurbanSendiri && !lastPelunasan && hidePelunasanFormBecauseNotReached && (
+      {profile && isInitialDepositMade && initialDepositStatus === "Approved" && !isQurbanSendiri && !lastPelunasan && hidePelunasanFormBecauseNotReached && (
         <div className="mb-4">
           <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
               <h4 className="font-semibold text-md text-blue-800 mb-1">Belum Mencapai Target</h4>
-              <p className="text-blue-700">Anda hanya dapat melakukan konfirmasi transfer pelunasan ke panitia jika tabungan Anda sudah mencapai target pribadi.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. Jika belum setoran awal, tampilkan form setoran awal */}
-      {profile && !isInitialDepositMade && appConfig && (
-        <div className="mb-4">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <h4 className="font-semibold text-md text-gray-800 mb-2">Setoran Awal Wajib</h4>
-            <div className="text-sm text-gray-600 mb-2">
-              <span>Jumlah pequrban: <span className="font-semibold">{jumlahPequrban}</span></span><br />
-              <span>Nominal setoran awal per pequrban: <span className="font-semibold">{formatRupiah(initialDepositPerPequrban)}</span></span><br />
-              <span className="block mt-1">Total setoran awal wajib: <span className="font-bold text-green-700">{formatRupiah(initialDeposit)}</span></span>
-              <span className="block text-xs text-gray-700 font-semibold mt-2 mb-1">Nomor Rekening Panitia:</span>
-              <div className="flex flex-col gap-2 mb-2">
-                <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col items-start">
-                  <span className="font-bold text-sm mb-1">CIMB Niaga Syariah</span>
-                  <span className="inline-flex items-center gap-1 text-base font-mono mb-1">
-                    7639 7360 6700
-                    <button
-                      type="button"
-                      className="ml-1 px-1 py-0.5 text-xs bg-gray-100 rounded hover:bg-green-200 flex items-center border border-gray-300"
-                      onClick={() => handleCopy("7639 7360 6700")}
-                      title="Copy rekening tanpa spasi"
-                    >
-                      <Copy size={13} className="mr-0.5" />Copy
-                    </button>
-                  </span>
-                  <span className="italic text-xs text-gray-700">Muhammad Andika Widiansyah Putra</span>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col items-start">
-                  <span className="font-bold text-sm mb-1">Bank Jago Syariah</span>
-                  <span className="inline-flex items-center gap-1 text-base font-mono mb-1">
-                    5048 8773 2512
-                    <button
-                      type="button"
-                      className="ml-1 px-1 py-0.5 text-xs bg-gray-100 rounded hover:bg-green-200 flex items-center border border-gray-300"
-                      onClick={() => handleCopy("5048 8773 2512")}
-                      title="Copy rekening tanpa spasi"
-                    >
-                      <Copy size={13} className="mr-0.5" />Copy
-                    </button>
-                  </span>
-                  <span className="italic text-xs text-gray-700">Muhammad Andika Widiansyah Putra</span>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm flex flex-col items-start">
-                  <span className="font-bold text-sm mb-1">Bank Syariah Indonesia</span>
-                  <span className="inline-flex items-center gap-1 text-base font-mono mb-1">
-                    665 6664 180
-                    <button
-                      type="button"
-                      className="ml-1 px-1 py-0.5 text-xs bg-gray-100 rounded hover:bg-green-200 flex items-center border border-gray-300"
-                      onClick={() => handleCopy("665 6664 180")}
-                      title="Copy rekening tanpa spasi"
-                    >
-                      <Copy size={13} className="mr-0.5" />Copy
-                    </button>
-                  </span>
-                  <span className="italic text-xs text-gray-700">Muhammad Andika Widiansyah Putra</span>
-                </div>
-              </div>
-            </div>
-            <form className="space-y-4" onSubmit={handleInitialDeposit}>
-              <div>
-                <label htmlFor="initialProofFile" className="block text-sm font-medium text-gray-700">
-                  Bukti Transfer (Wajib)
-                  <span className="block text-xs text-red-600 mt-1">Hanya file gambar (jpg, jpeg, png, webp) dan PDF yang diperbolehkan.</span>
-                </label>
-                <input
-                  type="file"
-                  id="initialProofFile"
-                  required
-                  accept="image/*,application/pdf"
-                  className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm font-medium"
-              >
-                Kirim Setoran Awal
-              </button>
-            </form>
-            <p id="initialMessage" className="text-sm mt-3"></p>
-          </div>
-        </div>
-      )}
-
-      {/* 5. Jika setoran awal sudah diupload tapi belum approved, tampilkan status verifikasi */}
-      {profile && isInitialDepositMade && profile?.InitialDepositStatus !== "Approved" && (
-        <div className="mb-4">
-          <div className="bg-white rounded-xl shadow-lg p-6">
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path
-                      fillRule="evenodd"
-                      d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-yellow-800">{profile?.InitialDepositStatus === "Rejected" ? "Setoran Awal Ditolak" : "Menunggu Verifikasi"}</h3>
-                  <div className="mt-2 text-sm text-yellow-700">
-                    {profile?.InitialDepositStatus === "Rejected" ? (
-                      <>
-                        <p className="text-red-700 font-semibold">Setoran awal Anda ditolak oleh admin.</p>
-                        {profile?.InitialDepositAdminNotes && (
-                          <p className="mt-1 text-red-700">Alasan: {profile.InitialDepositAdminNotes}</p>
-                        )}
-                        <p className="mt-1">Silakan upload ulang bukti transfer yang sesuai.</p>
-                      </>
-                    ) : (
-                      <>
-                        <p>
-                          Setoran awal Anda sedang dalam proses verifikasi admin. Anda belum dapat mencatat tabungan rutin
-                          hingga setoran awal diverifikasi.
-                        </p>
-                        <p className="mt-1">
-                          Status: <span className="font-semibold">{profile?.InitialDepositStatus || "Pending"}</span>
-                        </p>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <p className="text-blue-700">Anda hanya dapat melakukan konfirmasi transfer pelunasan ke panitia jika tabungan Anda sudah mencapai <b>target total</b> ({formatRupiah(targetTotal)}).</p>
             </div>
           </div>
         </div>
       )}
 
       {/* 6. Jika sudah setoran awal approved, tampilkan form catat setoran tabungan & penggunaan tabungan */}
-      {profile && isInitialDepositMade && profile?.InitialDepositStatus === "Approved" && !hideTabunganForms && (
+      {profile && isInitialDepositMade && initialDepositStatus === "Approved" && !hideTabunganForms && (
         <>
           <div className="mb-4">
             <div className="bg-white rounded-xl shadow-lg p-6">
@@ -558,8 +587,8 @@ export default function TransactionForms({
         </>
       )}
 
-    {/* Default: null (should not happen) */}
-    {null}
-  </>
+      {/* Default: null (should not happen) */}
+      {null}
+    </>
   );
 }
