@@ -3,6 +3,11 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import dynamic from "next/dynamic";
+
+// Optional: kalau kamu masih mau carousel highlight pendek (bisa dihilangkan)
+// Pastikan komponen ini memang ada. Kalau tidak, hapus 3 baris di bawah.
+const ProgramCarousel = dynamic(() => import("@/components/ProgramCarousel"), { ssr: false });
 
 export default function LandingPage() {
   const router = useRouter();
@@ -60,8 +65,8 @@ export default function LandingPage() {
       </header>
 
       {/* HERO */}
-      <section className="relative overflow-hidden mt-0 pt-0">
-  <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-0 pb-2 sm:pt-0 sm:pb-4 lg:pt-0 lg:pb-2 grid lg:grid-cols-2 gap-10 items-center mt-8">
+      <section className="relative overflow-hidden">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 lg:py-24 grid lg:grid-cols-2 gap-10 items-center">
           <div>
             <h1 className="text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight">
               Qurban yang <span className="text-emerald-600">lebih adil</span>,
@@ -108,9 +113,18 @@ export default function LandingPage() {
             </ul>
           </div>
 
-          {/* Partner strip saja, tanpa gambar statis/banner */}
+          {/* Optional highlight / carousel */}
           <div className="relative">
+            {/* Kalau tidak punya ProgramCarousel, kamu bisa ganti dengan gambar banner sendiri */}
+            <div className="rounded-2xl border border-gray-100 shadow-sm overflow-hidden bg-white">
+              <ProgramCarousel />
+            </div>
+
+            {/* Partner strip */}
             <div className="mt-6">
+              <div className="text-center text-xs uppercase tracking-widest text-gray-500 font-semibold mb-2">
+                Official Partner
+              </div>
               <div className="rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                 <Image
                   src="/landing/partners.jpg"
@@ -126,35 +140,13 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* PROJECT PREVIEW + IMPACT METRICS */}
-      <section className="bg-gray-50 border-y border-gray-100" id="preview">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid lg:grid-cols-2 gap-10 items-start">
-            <div className="rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <Image
-                src="/landing/preview.jpg"
-                alt="Preview Implementasi Qurban Berdampak"
-                width={1280}
-                height={720}
-                className="w-full h-auto"
-              />
-            </div>
-            <div>
-              <h2 className="text-3xl font-extrabold tracking-tight">Project Preview 2026</h2>
-              <p className="mt-3 text-gray-700">
-                Target implementasi di provinsi Gorontalo. Fokus pada masjid pedesaan minim qurban dan keluarga petani/pekerja
-                tani. Klik lokasi pada poster untuk melihat titik implementasi.
-              </p>
-
-              <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-6">
-                <Stat title="Ekor Sapi (2026 target)" value="6" />
-                <Stat title="Pequrban (on going)" value="42" />
-                <Stat title="Keluarga Penerima Manfaat" value="330" />
-                <Stat title="Beneficiary" value="960" />
-              </div>
-
-            </div>
-          </div>
+      {/* IMPACT METRICS */}
+      <section className="bg-gray-50 border-y border-gray-100">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-2 sm:grid-cols-4 gap-6">
+          <Stat title="Ekor Sapi (2026 target)" value="6" />
+          <Stat title="Pequrban (on going)" value="42" />
+          <Stat title="Keluarga Penerima Manfaat" value="330" />
+          <Stat title="Beneficiary" value="960" />
         </div>
       </section>
 
@@ -220,11 +212,52 @@ export default function LandingPage() {
               <Bullet>Kurangi ketergantungan pada tengkulak & bantuan</Bullet>
               <Bullet>Tambahan modal usaha kecil & akses harga bakalan yang lebih baik</Bullet>
             </ul>
-
+            <div className="mt-6">
+              <button onClick={goRegister} className="px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 shadow">
+                Mulai Jadi Pequrban
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
+      {/* PROJECT PREVIEW */}
+      <section id="preview" className="py-16 lg:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-10 items-start">
+            <div>
+              <h2 className="text-3xl font-extrabold tracking-tight">Project Preview 2026</h2>
+              <p className="mt-3 text-gray-700">
+                Target implementasi di provinsi Gorontalo. Fokus pada masjid pedesaan minim qurban dan keluarga petani/pekerja
+                tani. Klik lokasi pada poster untuk melihat titik implementasi.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Chip>6 Ekor Sapi</Chip>
+                <Chip>42 Pequrban</Chip>
+                <Chip>330 Keluarga</Chip>
+                <Chip>960 Beneficiary</Chip>
+              </div>
+              <div className="mt-6 flex gap-3">
+                <button onClick={goRegister} className="px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 shadow">
+                  Daftar Sekarang
+                </button>
+                <button onClick={goLogin} className="px-6 py-3 rounded-xl border border-gray-300 font-semibold hover:bg-gray-50">
+                  Masuk Akun
+                </button>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <Image
+                src="/landing/preview.jpg"
+                alt="Preview Implementasi Qurban Berdampak"
+                width={1280}
+                height={720}
+                className="w-full h-auto"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* FINAL CTA */}
       <section className="bg-emerald-700 text-white">
@@ -264,6 +297,8 @@ export default function LandingPage() {
     </div>
   );
 }
+
+/* ——— Small presentational components ——— */
 
 function Stat({ title, value }) {
   return (

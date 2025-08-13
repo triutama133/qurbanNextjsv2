@@ -74,6 +74,7 @@ function MobileDashboardTabs({
               formatRupiah={formatRupiah}
               getMonthDifference={getMonthDifference}
               allPersonalTransferConfirmations={transactionProps.allPersonalTransferConfirmations}
+              personalSavingHistory={transactionProps.personalSavingHistory}
             />
             {/* TransactionForms harus tetap dirender di mobile agar warning pelunasan pending/approved muncul */}
             {profile && (
@@ -92,6 +93,7 @@ function MobileDashboardTabs({
             <TransferHistory
               profile={profile}
               allPersonalTransferConfirmations={transactionProps.allPersonalTransferConfirmations}
+              personalSavingHistory={transactionProps.personalSavingHistory}
               loadingPersonal={loadingPersonal}
               formatRupiah={formatRupiah}
             />
@@ -152,21 +154,28 @@ function DashboardContent() {
       if (!user || !user.UserId) {
         return;
       }
-      try {
-        const url = `/api/kuisioner-status?user_id=${user.UserId}`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          if (!data.filled) {
-            router.replace('/kuisioner');
-            return;
+      // Tunggu sampai profile sudah ada
+      if (!profile) {
+        return;
+      }
+      // Hanya cek kuesioner jika setoran awal sudah Approved
+      if (profile.IsInitialDepositMade && profile.InitialDepositStatus === "Approved") {
+        try {
+          const url = `/api/kuisioner-status?user_id=${user.UserId}`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            if (!data.filled) {
+              router.replace('/kuisioner');
+              return;
+            }
           }
-        }
-      } catch (e) {}
+        } catch (e) {}
+      }
       setKuisionerChecked(true);
     }
     checkKuisioner();
-  }, [user, router]);
+  }, [user, profile, router]);
 
   useEffect(() => {
     async function fetchAllNews() {
@@ -307,6 +316,7 @@ function DashboardContent() {
     }
   }, [router]);
 
+
   // --- Dashboard actions ---
   const dashboardActions = useDashboardActions({
     user, profile, appConfig, personalTotalRecorded, personalUsed,
@@ -319,6 +329,37 @@ function DashboardContent() {
     handleAddSaving, handleUseSaving, handleInitialDeposit, handleConfirmTransfer, handleHelpDeskSubmit,
     showConfirmModal, handleEditTransaction, handleDeleteSaving, handleDeleteTransferConfirmation,
   } = dashboardActions;
+
+  // --- Explicit handler for refresh and sign out ---
+  const handleRefreshDashboard = useCallback(() => {
+    if (user && appConfig) {
+      fetchProfile(user.id)
+      Promise.allSettled([
+        fetchPersonalSectionData(user.id, profile, appConfig),
+        fetchNewsSection(newsPage),
+        fetchMilestonesSection(),
+        fetchHelpDeskTicketsSection(user.id),
+        fetchResourcesSection(user.id),
+      ]).then(() => {
+        const cacheKey = `dashboard-data-${user.id}`
+        sessionStorage.removeItem(cacheKey)
+      })
+    }
+  }, [
+    user, profile, appConfig, newsPage,
+    fetchProfile, fetchPersonalSectionData, fetchNewsSection,
+    fetchMilestonesSection, fetchHelpDeskTicketsSection, fetchResourcesSection,
+  ])
+
+  const handleSignOut = async () => {
+    setLoadingInitial(true)
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("qurban_user")
+      sessionStorage.clear()
+    }
+    router.push("/login")
+    setLoadingInitial(false)
+  }
 
   // --- Handler for Help Desk tab ---
   const handleGoToHelpDesk = () => {
@@ -397,8 +438,8 @@ function DashboardContent() {
       <div className="min-h-screen bg-gray-100">
         <DashboardHeader
           profile={profile}
-          handleRefreshDashboard={dashboardActions.handleRefreshDashboard || (() => {})}
-          handleSignOut={dashboardActions.handleSignOut || (() => {})}
+          handleRefreshDashboard={handleRefreshDashboard}
+          handleSignOut={handleSignOut}
           handleGoToHelpDesk={handleGoToHelpDesk}
         />
         <main className="max-w-2xl mx-auto py-10 px-4">
@@ -424,8 +465,8 @@ function DashboardContent() {
       <div className="min-h-screen bg-gray-100">
         <DashboardHeader
           profile={profile}
-          handleRefreshDashboard={dashboardActions.handleRefreshDashboard || (() => {})}
-          handleSignOut={dashboardActions.handleSignOut || (() => {})}
+          handleRefreshDashboard={handleRefreshDashboard}
+          handleSignOut={handleSignOut}
           handleGoToHelpDesk={handleGoToHelpDesk}
         />
         <main className="max-w-2xl mx-auto py-10 px-4">
@@ -472,8 +513,8 @@ function DashboardContent() {
     <div className="min-h-screen bg-gray-100">
       <DashboardHeader
         profile={profile}
-        handleRefreshDashboard={dashboardActions.handleRefreshDashboard || (() => {})}
-        handleSignOut={dashboardActions.handleSignOut || (() => {})}
+        handleRefreshDashboard={handleRefreshDashboard}
+        handleSignOut={handleSignOut}
         handleGoToHelpDesk={handleGoToHelpDesk}
       >
         {profile && profile.IsInitialDepositMade && profile.InitialDepositStatus === "Approved" && (
@@ -487,7 +528,7 @@ function DashboardContent() {
           {currentTab === "helpdesk" ? (
             <HelpDeskSection
               userHelpDeskTickets={userHelpDeskTickets}
-              loadingHelpDeskTickets={loadingHelpDeskFormLoading || loadingInitial}
+              loadingHelpDeskTickets={helpDeskFormLoading || loadingInitial}
               helpDeskFormLoading={helpDeskFormLoading}
               handleHelpDeskSubmit={handleHelpDeskSubmit}
             />
@@ -586,6 +627,7 @@ function DashboardContent() {
                         formatRupiah={formatRupiah}
                         getMonthDifference={getMonthDifference}
                         allPersonalTransferConfirmations={allPersonalTransferConfirmations}
+                        personalSavingHistory={personalSavingHistory}
                       />
                       <MilestoneProgram milestones={milestones} loadingMilestones={loadingMilestones} />
                       <NewsSection
@@ -633,6 +675,7 @@ function DashboardContent() {
                     <TransferHistory
                       profile={profile}
                       allPersonalTransferConfirmations={allPersonalTransferConfirmations}
+                      personalSavingHistory={personalSavingHistory}
                       loadingPersonal={loadingPersonal || loadingInitial}
                       formatRupiah={formatRupiah}
                     />

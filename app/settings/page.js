@@ -52,7 +52,18 @@ export default function SettingsPage() {
         const res = await fetch(`/api/get-user-profile?userId=${userObj.id || userObj.UserId}`);
         if (!res.ok) throw new Error('Gagal memuat profil');
         const profileData = await res.json();
-        setProfile(profileData);
+        // Set default value string kosong untuk field penting
+        setProfile({
+          Nickname: profileData.Nickname || '',
+          Provinsi: profileData.Provinsi || '',
+          Kota: profileData.Kota || '',
+          Pekerjaan: profileData.Pekerjaan || '',
+          StatusPernikahan: profileData.StatusPernikahan || '',
+          JumlahAnak: profileData.JumlahAnak || '',
+          Nama: profileData.Nama || '',
+          phone_number: profileData.phone_number || '',
+          ...profileData
+        });
         setFullName(profileData.Nama || '');
         setPequrbanName(profileData.NamaPequrban || '');
         setPhoneNumber(profileData.phone_number || '');
@@ -236,23 +247,35 @@ export default function SettingsPage() {
     const messageEl = document.getElementById('profileMessage');
 
     try {
-      // Kirim request ke endpoint custom
+      // Kirim seluruh field profil dari objek profile
+      const userId = user?.userId || user?.UserId || user?.id || user?.userid;
+      if (!userId) {
+        messageEl.textContent = 'User ID tidak ditemukan. Silakan logout dan login ulang.';
+        messageEl.className = 'text-sm mt-3 text-red-600';
+        setProfileLoading(false);
+        return;
+      }
+      const payload = {
+        userId,
+        Nickname: profile?.Nickname || '',
+        Provinsi: profile?.Provinsi || '',
+        Kota: profile?.Kota || '',
+        Pekerjaan: profile?.Pekerjaan || '',
+        StatusPernikahan: profile?.StatusPernikahan || '',
+        JumlahAnak: profile?.StatusPernikahan === 'Sudah Menikah' ? (profile?.JumlahAnak || 0) : 0,
+        Nama: profile?.Nama || '',
+        phone_number: profile?.phone_number || ''
+      };
       const res = await fetch('/api/settings-update-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user?.userId,
-          Nama: fullName,
-          NamaPequrban: pequrbanName,
-          phone_number: phoneNumber,
-        })
+        body: JSON.stringify(payload)
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Gagal update profil');
 
       messageEl.textContent = 'Profil berhasil diperbarui!';
       messageEl.className = 'text-sm mt-3 text-green-600';
-      setProfile({ Nama: fullName, NamaPequrban: pequrbanName });
     } catch (error) {
       messageEl.textContent = 'Gagal memperbarui profil: ' + error.message;
       messageEl.className = 'text-sm mt-3 text-red-600';
@@ -338,7 +361,7 @@ export default function SettingsPage() {
                       id="currentEmail"
                       value={currentEmail}
                       disabled
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-gray-500"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-50 text-black"
                     />
                   </div>
                   <div>
@@ -351,7 +374,7 @@ export default function SettingsPage() {
                       value={newEmail}
                       onChange={(e) => setNewEmail(e.target.value)}
                       required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-black"
                     />
                   </div>
                   <button
@@ -379,7 +402,7 @@ export default function SettingsPage() {
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-black"
                     />
                   </div>
                   <div>
@@ -392,7 +415,7 @@ export default function SettingsPage() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-black"
                     />
                   </div>
                   <div>
@@ -438,7 +461,7 @@ export default function SettingsPage() {
                       min={1}
                       max={10}
                       required
-                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
                       value={jumlahPequrban === 0 ? '' : jumlahPequrban}
                       onChange={(e) => {
                         const raw = e.target.value;
@@ -472,7 +495,7 @@ export default function SettingsPage() {
                       <input
                         type="text"
                         required
-                        className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                        className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
                         placeholder={`Masukkan nama pequrban ke-${idx + 1}`}
                         value={name}
                         onChange={(e) => {
@@ -500,6 +523,103 @@ export default function SettingsPage() {
               <div className="bg-white p-6 rounded-xl shadow-lg">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Ubah Informasi Profil</h3>
                 <form onSubmit={handleUpdateProfile} className="space-y-4">
+                  {/* Nama Panggilan */}
+                  <div>
+                    <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-1">
+                      Nama Panggilan
+                    </label>
+                    <input
+                      id="nickname"
+                      name="nickname"
+                      type="text"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                      value={profile?.Nickname || ''}
+                      onChange={e => setProfile(p => ({ ...p, Nickname: e.target.value }))}
+                    />
+                  </div>
+                  {/* Provinsi Domisili */}
+                  <div>
+                    <label htmlFor="province" className="block text-sm font-medium text-gray-700 mb-1">
+                      Provinsi Domisili
+                    </label>
+                    <input
+                      id="province"
+                      name="province"
+                      type="text"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                      value={profile?.Provinsi || ''}
+                      onChange={e => setProfile(p => ({ ...p, Provinsi: e.target.value }))}
+                    />
+                  </div>
+                  {/* Kota Domisili */}
+                  <div>
+                    <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                      Kota Domisili
+                    </label>
+                    <input
+                      id="city"
+                      name="city"
+                      type="text"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                      value={profile?.Kota || ''}
+                      onChange={e => setProfile(p => ({ ...p, Kota: e.target.value }))}
+                    />
+                  </div>
+                  {/* Pekerjaan */}
+                  <div>
+                    <label htmlFor="job" className="block text-sm font-medium text-gray-700 mb-1">
+                      Pekerjaan
+                    </label>
+                    <input
+                      id="job"
+                      name="job"
+                      type="text"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                      value={profile?.Pekerjaan || ''}
+                      onChange={e => setProfile(p => ({ ...p, Pekerjaan: e.target.value }))}
+                    />
+                  </div>
+                  {/* Status Pernikahan */}
+                  <div>
+                    <label htmlFor="marital-status" className="block text-sm font-medium text-gray-700 mb-1">
+                      Status Pernikahan
+                    </label>
+                    <select
+                      id="marital-status"
+                      name="marital-status"
+                      required
+                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                      value={profile?.StatusPernikahan || ''}
+                      onChange={e => setProfile(p => ({ ...p, StatusPernikahan: e.target.value }))}
+                    >
+                      <option value="" disabled>Status Pernikahan</option>
+                      <option value="Belum Menikah">Belum Menikah</option>
+                      <option value="Sudah Menikah">Sudah Menikah</option>
+                    </select>
+                  </div>
+                  {/* Jumlah Anak (jika sudah menikah) */}
+                  {profile?.StatusPernikahan === "Sudah Menikah" && (
+                    <div>
+                      <label htmlFor="children-count" className="block text-sm font-medium text-gray-700 mb-1">
+                        Jumlah Anak
+                      </label>
+                      <input
+                        id="children-count"
+                        name="children-count"
+                        type="number"
+                        min={0}
+                        required
+                        className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                        value={profile?.JumlahAnak || ''}
+                        onChange={e => setProfile(p => ({ ...p, JumlahAnak: e.target.value }))}
+                      />
+                    </div>
+                  )}
+                  {/* Nama Lengkap */}
                   <div>
                     <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
                       Nama Lengkap Pemilik Akun
@@ -507,12 +627,13 @@ export default function SettingsPage() {
                     <input
                       type="text"
                       id="fullName"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      value={profile?.Nama || ''}
+                      onChange={e => setProfile(p => ({ ...p, Nama: e.target.value }))}
                       required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-black"
                     />
                   </div>
+                  {/* Nomor HP */}
                   <div>
                     <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
                       Nomor HP
@@ -520,10 +641,10 @@ export default function SettingsPage() {
                     <input
                       type="tel"
                       id="phoneNumber"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9+]/g, ""))}
+                      value={profile?.phone_number || ''}
+                      onChange={e => setProfile(p => ({ ...p, phone_number: e.target.value.replace(/[^0-9+]/g, "") }))}
                       required
-                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500"
+                      className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-black"
                       placeholder="08xxxxxxxxxx"
                     />
                   </div>

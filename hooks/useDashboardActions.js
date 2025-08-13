@@ -194,81 +194,81 @@ export function useDashboardActions({
     }
   }
 
-  const handleInitialDeposit = async (e) => {
-    e.preventDefault()
-    const initialProofFile = e.target.elements.initialProofFile?.files[0]
-    const initialMessageEl = document.getElementById("initialMessage")
+  // Perbaikan: handleInitialDeposit menerima jumlah dari form (kekurangan saja)
+  const handleInitialDeposit = async (e, { jumlah } = {}) => {
+    e.preventDefault();
+    const initialProofFile = e.target.elements.initialProofFile?.files[0];
+    const initialMessageEl = document.getElementById("initialMessage");
 
     if (!initialProofFile) {
-      initialMessageEl.textContent = "Bukti transfer wajib diunggah."
-      initialMessageEl.className = "text-sm mt-3 text-red-600"
-      return
+      initialMessageEl.textContent = "Bukti transfer wajib diunggah.";
+      initialMessageEl.className = "text-sm mt-3 text-red-600";
+      return;
     }
 
     try {
-      initialMessageEl.textContent = "Mengunggah bukti & Mencatat Setoran Awal..."
-      initialMessageEl.className = "text-sm mt-3 text-gray-600"
+      initialMessageEl.textContent = "Mengunggah bukti & Mencatat Setoran Awal...";
+      initialMessageEl.className = "text-sm mt-3 text-gray-600";
 
-      const newTransactionId = `INIT-${Date.now()}`
+      const newTransactionId = `INIT-${Date.now()}`;
       const fileData = {
         name: initialProofFile.name,
         mimeType: initialProofFile.type,
         data: await readFileAsBase64(initialProofFile),
         userId: getUserId(),
         transactionId: newTransactionId,
-      }
+      };
       const uploadResponse = await fetch("/api/upload-file", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(fileData),
-      })
-      const uploadResult = await uploadResponse.json()
+      });
+      const uploadResult = await uploadResponse.json();
       if (!uploadResponse.ok || uploadResult.error) {
-        throw new Error(uploadResult.error || "Gagal mengunggah bukti setoran awal.")
+        throw new Error(uploadResult.error || "Gagal mengunggah bukti setoran awal.");
       }
-      const proofUrl = uploadResult.fileUrl
+      const proofUrl = uploadResult.fileUrl;
 
-      const newTanggal = new Date().toISOString()
-      // Perbaikan: hitung total setoran awal sesuai jumlah pequrban
-      const jumlahPequrban = Number(profile?.JumlahPequrban) || 1;
-      const initialDepositPerPequrban = appConfig?.InitialDepositAmount || 300000;
-      const totalInitialDeposit = initialDepositPerPequrban * jumlahPequrban;
+      const newTanggal = new Date().toISOString();
+      // Ambil jumlah dari argumen (kekurangan saja)
+      const jumlahSetoran = typeof jumlah === 'number' ? jumlah : 0;
+      if (jumlahSetoran <= 0) throw new Error("Jumlah setoran awal tidak valid.");
 
       const { data: savingData, error: savingError } = await supabase.from("tabungan").insert({
         TransaksiId: newTransactionId,
         UserId: getUserId(),
-        Jumlah: totalInitialDeposit,
+        Jumlah: jumlahSetoran,
         Metode: "Setoran Awal",
         Tanggal: newTanggal,
         Tipe: "Setoran",
         Status: "Confirmed",
         ProofLink: proofUrl,
         VerificationStatus: "Pending",
-      })
+      });
 
       if (savingError) {
-        throw savingError
+        throw savingError;
       }
 
       const { error: updateError } = await supabase
         .from("users")
         .update({ IsInitialDepositMade: true, InitialDepositStatus: "Pending" })
-        .eq("UserId", getUserId())
+        .eq("UserId", getUserId());
 
       if (updateError) {
-        throw updateError
+        throw updateError;
       }
 
-      initialMessageEl.textContent = "Setoran Awal berhasil dicatat! Menunggu verifikasi."
-      initialMessageEl.className = "text-sm mt-3 text-green-600"
-      e.target.reset()
-      setProfile((prevProfile) => ({ ...prevProfile, IsInitialDepositMade: true, InitialDepositStatus: "Pending" }))
+      initialMessageEl.textContent = "Setoran Awal berhasil dicatat! Menunggu verifikasi.";
+      initialMessageEl.className = "text-sm mt-3 text-green-600";
+      e.target.reset();
+      setProfile((prevProfile) => ({ ...prevProfile, IsInitialDepositMade: true, InitialDepositStatus: "Pending" }));
       setPersonalSavingHistory((prev) =>
         [
           {
             TransaksiId: newTransactionId,
             UserId: getUserId(),
-            Jumlah: totalInitialDeposit,
+            Jumlah: jumlahSetoran,
             Metode: "Setoran Awal",
             Tanggal: newTanggal,
             Tipe: "Setoran",
@@ -278,14 +278,14 @@ export function useDashboardActions({
           },
           ...prev,
         ].sort((a, b) => new Date(b.Tanggal) - new Date(a.Tanggal)),
-      )
-      setPersonalTotalRecorded((prev) => prev + totalInitialDeposit)
+      );
+      setPersonalTotalRecorded((prev) => prev + jumlahSetoran);
     } catch (err) {
-      console.error("Error initial deposit:", err.message)
-      initialMessageEl.textContent = "Gagal mencatat setoran awal: " + err.message
-      initialMessageEl.className = "text-sm mt-3 text-red-600"
+      console.error("Error initial deposit:", err.message);
+      initialMessageEl.textContent = "Gagal mencatat setoran awal: " + err.message;
+      initialMessageEl.className = "text-sm mt-3 text-red-600";
     }
-  }
+  };
 
   // ----------- PERUBAHAN PENTING DISINI -----------
   // Refactored: handleConfirmTransfer pakai callback, tanpa akses DOM

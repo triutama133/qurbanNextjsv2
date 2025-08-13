@@ -111,24 +111,22 @@ export function useDashboardData() {
 
       setPersonalSavingHistory(normSavings)
 
-      // === PERHITUNGAN TANPA DOUBLE COUNT SETORAN AWAL ===
+      // === PERHITUNGAN TABUNGAN & SETORAN AWAL ===
       // 1) Hitung tabungan rutin SAJA (tanpa "Setoran Awal")
       let totalRecorded = 0
       let totalUsed = 0
       for (const item of normSavings) {
         if (item.Tipe === "Setoran" && item.Metode !== "Setoran Awal") {
           totalRecorded += item.Jumlah
+        } else if (
+          item.Tipe === "Setoran" && item.Metode === "Setoran Awal" &&
+          ((item.Status && item.Status.toLowerCase() === "confirmed") ||
+           (item.VerificationStatus && item.VerificationStatus.toLowerCase() === "approved"))
+        ) {
+          totalRecorded += item.Jumlah
         } else if (item.Tipe === "Penggunaan") {
           totalUsed += item.Jumlah
         }
-      }
-
-      // 2) Tambahkan "Setoran Awal" tepat SATU kali jika Approved (total = per pequrban * jumlah pequrban)
-      const jumlahPequrban = Number(currentProfile?.JumlahPequrban) || 1
-      const initialDepositPerPequrban = Number(currentAppConfig?.InitialDepositAmount) || 0
-      const initialDepositTotal = initialDepositPerPequrban * jumlahPequrban
-      if (currentProfile?.InitialDepositStatus === "Approved" && initialDepositTotal > 0) {
-        totalRecorded += initialDepositTotal
       }
 
       setPersonalTotalRecorded(totalRecorded)
@@ -150,44 +148,13 @@ export function useDashboardData() {
           }))
         : []
 
-      // Synthetic transfer untuk Setoran Awal (hanya untuk riwayat) — tetap aman meski upload ulang
-      let initialDepositTransfer = null
-      if (currentProfile?.InitialDepositStatus === "Approved" && initialDepositTotal > 0) {
-        // Kalau ada entri saving "Setoran Awal" dengan ProofLink, pakai itu
-        const initialDepositSaving = normSavings.find(
-          (item) => item.Tipe === "Setoran" && item.Metode === "Setoran Awal" && item.ProofLink
-        )
-        if (initialDepositSaving) {
-          initialDepositTransfer = {
-            ConfirmationId: `initial-${initialDepositSaving.TabunganId || initialDepositSaving.id || Math.random()}`,
-            Amount: Number(initialDepositSaving.Jumlah || initialDepositTotal),
-            Timestamp: initialDepositSaving.Tanggal || new Date().toISOString(),
-            Status: "Approved",
-            ProofLink: initialDepositSaving.ProofLink,
-            Type: "Setoran Awal",
-          }
-        } else {
-          initialDepositTransfer = {
-            ConfirmationId: `initial-${userId}`,
-            Amount: Number(initialDepositTotal),
-            Timestamp: currentProfile?.InitialDepositDate || new Date().toISOString(),
-            Status: "Approved",
-            ProofLink: currentProfile?.InitialDepositProof || null,
-            Type: "Setoran Awal",
-          }
-        }
-      }
-
-      // Gabungkan → sort DESC by Timestamp → dedupe by ConfirmationId
+      // Gabungkan semua transfer, sort DESC by Timestamp, dedupe by ConfirmationId
       let allTransfersFull = [...transferData]
-      if (initialDepositTransfer) {
-        allTransfersFull = [initialDepositTransfer, ...allTransfersFull]
-      }
-
+      // Pastikan semua setoran awal (dan pelunasan) muncul, urut terbaru di atas
       allTransfersFull.sort(
         (a, b) => new Date(b.Timestamp || 0) - new Date(a.Timestamp || 0)
       )
-
+      // Dedupe hanya jika benar-benar ada duplikat persis (ConfirmationId sama persis)
       const seen = new Set()
       allTransfersFull = allTransfersFull.filter((t) => {
         const key = t.ConfirmationId || `${t.Type}-${t.Timestamp}-${t.Amount}`
@@ -195,7 +162,6 @@ export function useDashboardData() {
         seen.add(key)
         return true
       })
-
       setAllPersonalTransferConfirmations(allTransfersFull)
 
       // Hanya Approved untuk progress

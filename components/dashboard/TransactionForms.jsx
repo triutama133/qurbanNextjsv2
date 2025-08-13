@@ -53,10 +53,24 @@ export default function TransactionForms({
   const initialDepositStatus = profile?.InitialDepositStatus;
   const jumlahPequrban = Number(profile?.JumlahPequrban) || 1;
   const initialDepositPerPequrban = appConfig?.InitialDepositAmount || 300000;
-  // Total setoran awal = semua transfer_confirmation Type 'Setoran Awal' yang Approved
-  const totalSetoranAwal = (allPersonalTransferConfirmations || [])
-    .filter(item => (item.Type || '').toLowerCase() === 'setoran awal' && item.Status === 'Approved')
-    .reduce((sum, item) => sum + (item.Amount || 0), 0);
+  // Total setoran awal = semua tabungan dengan Metode 'Setoran Awal', Tipe 'Setoran', dan status approved
+  const totalSetoranAwal = (personalSavingHistory || [])
+    .filter(item =>
+      (item.Metode || '').toLowerCase() === 'setoran awal' &&
+      (item.Tipe || '').toLowerCase() === 'setoran' &&
+      (
+        (item.Status && item.Status.toLowerCase() === 'confirmed') ||
+        (item.VerificationStatus && item.VerificationStatus.toLowerCase() === 'approved')
+      )
+    )
+    .reduce((sum, item) => sum + (item.Jumlah || 0), 0);
+
+  // Jika user upload setoran awal tambahan, otomatis hanya boleh input kekurangannya saja
+  const targetSetoranAwal = initialDepositPerPequrban * jumlahPequrban;
+  const kekuranganSetoranAwal = Math.max(0, targetSetoranAwal - totalSetoranAwal);
+
+  // Pada form setoran awal, input jumlah otomatis diisi kekurangan saja
+  // (implementasi di renderInitialDepositForm)
   const initialDeposit = initialDepositPerPequrban * jumlahPequrban;
   const targetPribadi = profile?.TargetPribadi || 2650000;
   const targetTotal = targetPribadi * jumlahPequrban;
@@ -183,7 +197,16 @@ export default function TransactionForms({
             </div>
           </div>
 
-          <form className="space-y-4" onSubmit={handleInitialDeposit}>
+          <form className="space-y-4" onSubmit={e => {
+            e.preventDefault();
+            // Ambil kekurangan saja
+            const jumlahInput = kekuranganSetoranAwal;
+            if (jumlahInput <= 0) return;
+            // Kirim ke handleInitialDeposit dengan jumlah kekurangan
+            if (handleInitialDeposit) {
+              handleInitialDeposit(e, { jumlah: jumlahInput });
+            }
+          }}>
             <div>
               <label htmlFor="initialProofFile" className="block text-sm font-medium text-gray-700">
                 Bukti Transfer (Wajib)
@@ -197,9 +220,19 @@ export default function TransactionForms({
                 className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Jumlah Setoran Awal (Otomatis):</label>
+              <input
+                type="text"
+                value={formatRupiah(kekuranganSetoranAwal)}
+                readOnly
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm bg-gray-100 text-gray-700"
+              />
+            </div>
             <button
               type="submit"
               className="w-full bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm font-medium"
+              disabled={kekuranganSetoranAwal <= 0}
             >
               {isResubmission ? "Kirim Ulang Setoran Awal" : "Kirim Setoran Awal"}
             </button>
@@ -371,7 +404,6 @@ export default function TransactionForms({
   }
 
   // Jika totalSetoranAwal < targetSetoranAwal, wajib upload tambahan
-  const targetSetoranAwal = initialDepositPerPequrban * jumlahPequrban;
   if (profile && isInitialDepositMade && initialDepositStatus === "Approved" && totalSetoranAwal < targetSetoranAwal) {
     return (
       <>
@@ -391,7 +423,7 @@ export default function TransactionForms({
   if (profile && isInitialDepositMade && initialDepositStatus === "Pending") {
     return (
       <>
-        <div className="mb-4">
+         <div className="mb-4">
           <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
               <h3 className="text-sm font-semibold text-yellow-800">Menunggu Verifikasi</h3>
