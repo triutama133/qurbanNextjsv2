@@ -55,7 +55,7 @@ export default function LoginPage() {
         setMessage("Login user berhasil! Mengarahkan ke dashboard...");
         setMessageType("success");
         setTimeout(() => {
-          router.push("/dashboard");
+          router.push("/qurban/dashboard");
         }, 1500);
       }
     } catch (err) {
@@ -153,7 +153,7 @@ export default function LoginPage() {
             </div>
             <div className="mt-3">
               <a
-                href="/register"
+                href="/qurban/register"
                 className="block w-full text-center py-2 px-4 rounded-md bg-blue-600 text-white font-bold text-base hover:bg-blue-700 transition-colors"
                 style={{letterSpacing: '0.5px'}}>
                 Belum punya akun? Daftar Qurban Sekarang
@@ -208,7 +208,7 @@ export default function LoginPage() {
             </div>
           )}
           <p className="mt-4 text-center text-sm text-gray-600">
-            <a href="/admin-login" className="font-medium text-[#E53935] hover:text-red-700">
+            <a href="/qurban/admin-login" className="font-medium text-[#E53935] hover:text-red-700">
               Login sebagai Admin
             </a>
           </p>

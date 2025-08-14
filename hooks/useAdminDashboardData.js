@@ -49,7 +49,7 @@ export default function useAdminDashboardData() {
       // Overview
       setOverallProgramProgress({
         totalCollectedAmount: data.totalTabunganTercatat ?? 0,
-        confirmedAmount: data.totalTabunganTransfer ?? 0,
+        confirmedAmount: data.totalDanaTerkonfirmasi ?? 0,
         totalUsedAmount: data.totalTabunganTerpakai ?? 0,
         totalCosts: data.totalBiayaOperasional ?? 0,
         cowStatus: data.cowStatus || { fullTarget: 0, green: 0, yellow: 0 },

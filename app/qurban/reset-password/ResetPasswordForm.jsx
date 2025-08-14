@@ -43,7 +43,7 @@ export default function ResetPasswordForm() {
       if (!res.ok) throw new Error(result.error || "Gagal reset password");
       setSuccess(true);
       setMessage("Password berhasil direset! Silakan login dengan password baru.");
-      setTimeout(() => router.push("/login"), 2000);
+  setTimeout(() => router.push("/qurban/login"), 2000);
     } catch (error) {
       setMessage(error.message);
     } finally {

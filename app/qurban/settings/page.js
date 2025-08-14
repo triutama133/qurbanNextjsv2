@@ -1,12 +1,24 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { useDashboardData } from '../../../hooks/useDashboardData';
 // import supabase from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
 export default function SettingsPage() {
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null);
+  // Ambil data dari dashboard hook
+  const {
+    user,
+    profile,
+    appConfig,
+    personalSavingHistory,
+    allPersonalTransferConfirmations,
+    loadingPersonal,
+    fetchUserAndInit,
+    fetchPersonalSectionData,
+    fetchProfile,
+  } = useDashboardData();
+  const [isLunas, setIsLunas] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('account'); // 'account' or 'profile'
   
@@ -33,58 +45,39 @@ export default function SettingsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Ambil user dari localStorage
-    const userStr = typeof window !== 'undefined' ? localStorage.getItem('qurban_user') : null;
-    const userObj = userStr ? JSON.parse(userStr) : null;
-    if (!userObj) {
-      router.push('/login');
+    if (user && !profile) {
+      fetchProfile(user.id);
       return;
     }
-    // Pastikan field UserId selalu ada
-    const userId = userObj.UserId || userObj.id || userObj.userid || userObj.userId;
-    setUser({ ...userObj, userId });
-    setCurrentEmail(userObj.Email || '');
-    setNewEmail(userObj.Email || '');
-
-    // Fetch profile dari API custom
-    async function fetchProfile() {
-      try {
-        const res = await fetch(`/api/get-user-profile?userId=${userObj.id || userObj.UserId}`);
-        if (!res.ok) throw new Error('Gagal memuat profil');
-        const profileData = await res.json();
-        // Set default value string kosong untuk field penting
-        setProfile({
-          Nickname: profileData.Nickname || '',
-          Provinsi: profileData.Provinsi || '',
-          Kota: profileData.Kota || '',
-          Pekerjaan: profileData.Pekerjaan || '',
-          StatusPernikahan: profileData.StatusPernikahan || '',
-          JumlahAnak: profileData.JumlahAnak || '',
-          Nama: profileData.Nama || '',
-          phone_number: profileData.phone_number || '',
-          ...profileData
-        });
-        setFullName(profileData.Nama || '');
-        setPequrbanName(profileData.NamaPequrban || '');
-        setPhoneNumber(profileData.phone_number || '');
-        // Inisialisasi jumlah dan nama pequrban
-        const jumlah = profileData.JumlahPequrban || (Array.isArray(profileData.NamaPequrban) ? profileData.NamaPequrban.length : 1);
-        setJumlahPequrban(jumlah);
-        if (Array.isArray(profileData.NamaPequrban)) {
-          setPequrbanNames(profileData.NamaPequrban);
-        } else if (typeof profileData.NamaPequrban === 'string') {
-          setPequrbanNames([profileData.NamaPequrban]);
-        } else {
-          setPequrbanNames(['']);
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setLoading(false);
-      }
+    if (!user) {
+      fetchUserAndInit(router);
+      return;
     }
-    fetchProfile();
-  }, [router]);
+    if (user && !personalSavingHistory.length && !allPersonalTransferConfirmations.length) {
+      fetchPersonalSectionData(user.id, profile, appConfig);
+      return;
+    }
+    if (profile) {
+      const jumlahPequrban = Number(profile?.JumlahPequrban) || 1;
+      const targetPribadi = profile?.TargetPribadi || 2650000;
+      const targetTotal = targetPribadi * jumlahPequrban;
+      const totalSetoranAwal = (personalSavingHistory || [])
+        .filter(item =>
+          (item.Metode || '').toLowerCase() === 'setoran awal' &&
+          (item.Tipe || '').toLowerCase() === 'setoran' &&
+          ((item.Status && item.Status.toLowerCase() === 'confirmed') ||
+            (item.VerificationStatus && item.VerificationStatus.toLowerCase() === 'approved'))
+        )
+        .reduce((sum, item) => sum + (item.Jumlah || 0), 0);
+      const pelunasanList = (allPersonalTransferConfirmations || [])
+        .filter(item => (item.Type || '').toLowerCase() !== 'setoran awal');
+      const totalPelunasanApproved = pelunasanList
+        .filter(item => (item.Status || '').toLowerCase() === 'approved')
+        .reduce((sum, item) => sum + (item.Amount || 0), 0);
+      setIsLunas((totalPelunasanApproved + totalSetoranAwal) >= targetTotal);
+      setLoading(false);
+    }
+  }, [user, profile, appConfig, personalSavingHistory, allPersonalTransferConfirmations, router, fetchUserAndInit, fetchPersonalSectionData]);
 
   // Handler update pequrban
   const handleUpdatePequrban = async (e) => {
@@ -136,7 +129,6 @@ export default function SettingsPage() {
         JumlahPequrban: jumlahPequrban,
         TargetPribadi: newTargetPribadi
       };
-      console.log('[UPDATE PEQURBAN PAYLOAD]', payload);
       const res = await fetch('/api/settings-update-pequrban', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -303,7 +295,7 @@ export default function SettingsPage() {
           </div>
           <div className="w-full sm:w-auto flex justify-start sm:justify-end">
             <a
-              href="/dashboard"
+              href="/qurban/dashboard"
               className="inline-flex items-center px-4 py-2 border border-green-600 text-green-700 bg-white rounded-lg shadow-sm text-sm font-semibold hover:bg-green-50 active:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-400 transition"
               style={{ minWidth: 'fit-content' }}
             >
@@ -449,71 +441,78 @@ export default function SettingsPage() {
             <>
               <div className="bg-white p-6 rounded-xl shadow-lg mb-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Ubah Data Pequrban</h3>
-                <form onSubmit={handleUpdatePequrban} className="space-y-4">
-                  <div>
-                    <label htmlFor="jumlah-pequrban" className="block text-sm font-medium text-gray-700 mb-1">
-                      Jumlah Pequrban
-                    </label>
-                    <input
-                      id="jumlah-pequrban"
-                      name="jumlah-pequrban"
-                      type="number"
-                      min={1}
-                      max={10}
-                      required
-                      className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
-                      value={jumlahPequrban === 0 ? '' : jumlahPequrban}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        if (raw === '') {
-                          setJumlahPequrban(0);
-                          setPequrbanNames([]);
-                          return;
-                        }
-                        let val = Number(raw);
-                        if (isNaN(val)) val = 0;
-                        if (val > 10) val = 10;
-                        setJumlahPequrban(val);
-                        setPequrbanNames((prev) => {
-                          const arr = [...prev];
-                          if (val > arr.length) {
-                            for (let i = arr.length; i < val; i++) arr.push('');
-                          } else if (val < arr.length) {
-                            arr.length = val;
-                          }
-                          return arr;
-                        });
-                      }}
-                    />
+                {isLunas ? (
+                  <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-4">
+                    <h4 className="font-semibold text-md text-green-800 mb-1">Status: Lunas</h4>
+                    <p className="text-green-700">Tabungan dan pelunasan Anda sudah diverifikasi admin. Jumlah pequrban tidak dapat diubah.</p>
                   </div>
-                  {/* Nama-nama Pequrban */}
-                  {pequrbanNames.map((name, idx) => (
-                    <div key={idx}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nama Pequrban #{idx + 1}
+                ) : (
+                  <form onSubmit={handleUpdatePequrban} className="space-y-4">
+                    <div>
+                      <label htmlFor="jumlah-pequrban" className="block text-sm font-medium text-gray-700 mb-1">
+                        Jumlah Pequrban
                       </label>
                       <input
-                        type="text"
+                        id="jumlah-pequrban"
+                        name="jumlah-pequrban"
+                        type="number"
+                        min={1}
+                        max={10}
                         required
                         className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
-                        placeholder={`Masukkan nama pequrban ke-${idx + 1}`}
-                        value={name}
+                        value={jumlahPequrban === 0 ? '' : jumlahPequrban}
                         onChange={(e) => {
-                          const arr = [...pequrbanNames];
-                          arr[idx] = e.target.value;
-                          setPequrbanNames(arr);
+                          const raw = e.target.value;
+                          if (raw === '') {
+                            setJumlahPequrban(0);
+                            setPequrbanNames([]);
+                            return;
+                          }
+                          let val = Number(raw);
+                          if (isNaN(val)) val = 0;
+                          if (val > 10) val = 10;
+                          setJumlahPequrban(val);
+                          setPequrbanNames((prev) => {
+                            const arr = [...prev];
+                            if (val > arr.length) {
+                              for (let i = arr.length; i < val; i++) arr.push('');
+                            } else if (val < arr.length) {
+                              arr.length = val;
+                            }
+                            return arr;
+                          });
                         }}
                       />
                     </div>
-                  ))}
-                  <button
-                    type="submit"
-                    disabled={pequrbanLoading}
-                    className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 font-medium"
-                  >
-                    {pequrbanLoading ? 'Memperbarui...' : 'Perbarui Data Pequrban'}
-                  </button>
-                </form>
+                    {/* Nama-nama Pequrban */}
+                    {pequrbanNames.map((name, idx) => (
+                      <div key={idx}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Nama Pequrban #{idx + 1}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-black rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 focus:z-10 sm:text-sm"
+                          placeholder={`Masukkan nama pequrban ke-${idx + 1}`}
+                          value={name}
+                          onChange={(e) => {
+                            const arr = [...pequrbanNames];
+                            arr[idx] = e.target.value;
+                            setPequrbanNames(arr);
+                          }}
+                        />
+                      </div>
+                    ))}
+                    <button
+                      type="submit"
+                      disabled={pequrbanLoading}
+                      className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50 font-medium"
+                    >
+                      {pequrbanLoading ? 'Memperbarui...' : 'Perbarui Data Pequrban'}
+                    </button>
+                  </form>
+                )}
                 {pequrbanMessage && (
                   <div className={`py-2 px-3 rounded-md text-sm mt-2 ${pequrbanMessageType === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
                     {pequrbanMessage}

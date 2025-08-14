@@ -166,7 +166,7 @@ function DashboardContent() {
           if (res.ok) {
             const data = await res.json();
             if (!data.filled) {
-              router.replace('/kuisioner');
+              router.replace('/qurban/kuisioner');
               return;
             }
           }
@@ -311,7 +311,7 @@ function DashboardContent() {
     if (typeof window !== "undefined") {
       const userStr = localStorage.getItem("qurban_user")
       if (!userStr) {
-        router.push("/login")
+  router.push("/qurban/login")
       }
     }
   }, [router]);
@@ -357,7 +357,7 @@ function DashboardContent() {
       localStorage.removeItem("qurban_user")
       sessionStorage.clear()
     }
-    router.push("/login")
+  router.push("/qurban/login")
     setLoadingInitial(false)
   }
 
@@ -365,7 +365,7 @@ function DashboardContent() {
   const handleGoToHelpDesk = () => {
     const params = new URLSearchParams(window.location.search)
     params.set("tab", "helpdesk")
-    router.push(`/dashboard?${params.toString()}`)
+  router.push(`/qurban/dashboard?${params.toString()}`)
   };
 
   // --- Notification logic ---

@@ -12,13 +12,24 @@ export async function GET(req) {
     .eq('Status', 'Confirmed');
   const totalTabunganTercatat = (totalSetoranData || []).reduce((acc, cur) => acc + Number(cur.Jumlah), 0);
 
-  // 2. Total tabungan transfer
-  const { data: totalTransferData } = await supabase
+  // 2. Dana terkonfirmasi (Setoran Awal + Pelunasan Approved)
+  // Setoran Awal (Confirmed)
+  const { data: setoranAwalConfirmed } = await supabase
     .from('tabungan')
     .select('Jumlah')
-    .eq('Tipe', 'Transfer')
+    .eq('Metode', 'Setoran Awal')
     .eq('Status', 'Confirmed');
-  const totalTabunganTransfer = (totalTransferData || []).reduce((acc, cur) => acc + Number(cur.Jumlah), 0);
+  const totalSetoranAwalConfirmed = (setoranAwalConfirmed || []).reduce((acc, cur) => acc + Number(cur.Jumlah), 0);
+
+  // Semua transfer_confirmations yang Status-nya Approved
+  const { data: pelunasanApproved } = await supabase
+    .from('transfer_confirmations')
+    .select('Amount, Status')
+    .eq('Status', 'Approved');
+  const totalPelunasanApproved = (pelunasanApproved || []).reduce((acc, cur) => acc + Number(cur.Amount), 0);
+
+  // Dana terkonfirmasi = Setoran Awal Confirmed + Pelunasan Approved
+  const totalDanaTerkonfirmasi = totalSetoranAwalConfirmed + totalPelunasanApproved;
 
   // 3. Total tabungan terpakai
   const { data: totalTerpakaiData } = await supabase
@@ -29,7 +40,7 @@ export async function GET(req) {
   const totalTabunganTerpakai = (totalTerpakaiData || []).reduce((acc, cur) => acc + Number(cur.Jumlah), 0);
 
   // 4. Total sisa tabungan
-  const totalSisaTabungan = totalTabunganTercatat - totalTabunganTerpakai - totalTabunganTransfer;
+  const totalSisaTabungan = totalTabunganTercatat - totalTabunganTerpakai - totalDanaTerkonfirmasi;
 
   // 5. Total biaya operasional
   const { data: biayaData } = await supabase
@@ -121,7 +132,7 @@ export async function GET(req) {
 
   return Response.json({
     totalTabunganTercatat,
-    totalTabunganTransfer,
+    totalDanaTerkonfirmasi,
     totalTabunganTerpakai,
     totalSisaTabungan,
     totalBiayaOperasional,

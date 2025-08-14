@@ -96,7 +96,7 @@ export default function HelpDeskSection({
         </div>
       </div>
       <div className="mt-6 text-center">
-        <a href="/dashboard" className="text-indigo-600 hover:text-indigo-800 font-medium">
+        <a href="/qurban/dashboard" className="text-indigo-600 hover:text-indigo-800 font-medium">
           &larr; Kembali ke Dashboard Utama
         </a>
       </div>

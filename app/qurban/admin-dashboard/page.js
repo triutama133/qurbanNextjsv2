@@ -3,18 +3,18 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import supabase from "@/lib/supabase"
-import AdminOverview from "../../components/admin/AdminOverview"
-import AdminTabs from "../../components/admin/AdminTabs"
-import AdminHeader from "../../components/admin/AdminHeader"
-import PendingVerificationsTab from "../../components/admin/tabs/PendingVerificationsTab"
-import UserManagementTab from "../../components/admin/tabs/UserManagementTab"
-import HelpDeskTab from "../../components/admin/tabs/HelpDeskTab"
-import DocumentsTab from "../../components/admin/tabs/DocumentsTab"
-import MilestonesTab from "../../components/admin/tabs/MilestonesTab"
-import NewsTab from "../../components/admin/tabs/NewsTab"
-import ReportsTab from "../../components/admin/tabs/ReportsTab"
-import OperationalCostsTab from "../../components/admin/tabs/OperationalCostsTab"
-import useAdminDashboardData from "../../hooks/useAdminDashboardData"
+import AdminOverview from "../../../components/admin/AdminOverview"
+import AdminTabs from "../../../components/admin/AdminTabs"
+import AdminHeader from "../../../components/admin/AdminHeader"
+import PendingVerificationsTab from "../../../components/admin/tabs/PendingVerificationsTab"
+import UserManagementTab from "../../../components/admin/tabs/UserManagementTab"
+import HelpDeskTab from "../../../components/admin/tabs/HelpDeskTab"
+import DocumentsTab from "../../../components/admin/tabs/DocumentsTab"
+import MilestonesTab from "../../../components/admin/tabs/MilestonesTab"
+import NewsTab from "../../../components/admin/tabs/NewsTab"
+import ReportsTab from "../../../components/admin/tabs/ReportsTab"
+import OperationalCostsTab from "../../../components/admin/tabs/OperationalCostsTab"
+import useAdminDashboardData from "../../../hooks/useAdminDashboardData"
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("pending")
@@ -73,7 +73,7 @@ export default function AdminDashboard() {
   // Logout handler
   const handleSignOut = async () => {
     await supabase.auth.signOut()
-    router.push("/login")
+  router.push("/qurban/login")
   }
 
   const tabs = [

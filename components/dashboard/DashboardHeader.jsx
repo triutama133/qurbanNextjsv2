@@ -17,7 +17,7 @@ export default function DashboardHeader({ profile, handleRefreshDashboard, handl
           <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 mt-2 sm:mt-0">
             {children}
             <a
-              href="/settings"
+              href="/qurban/settings"
               className="inline-flex items-center justify-center border border-gray-300 bg-white text-sm font-medium text-gray-700 px-4 py-2 rounded-md shadow-sm hover:bg-green-50 hover:text-green-700 transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
             >
               Pengaturan Akun

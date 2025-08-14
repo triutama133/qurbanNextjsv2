@@ -153,7 +153,7 @@ export default function RegisterPage() {
     setMessage("Pendaftaran berhasil! Silakan login.")
     setMessageType("success")
     setTimeout(() => {
-      router.push("/login")
+      router.push("/qurban/login")
     }, 5000)
     setLoading(false)
   }
@@ -167,26 +167,10 @@ export default function RegisterPage() {
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSignUp}>
           <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label htmlFor="full-name" className="block text-sm font-medium text-gray-700 mb-1">
-                Nama Lengkap Pemilik Akun
-              </label>
-              <input
-                id="full-name"
-                name="full-name"
-                type="text"
-                autoComplete="name"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Masukkan nama lengkap Anda"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-              />
-            </div>
             {/* Nama panggilan */}
             <div>
               <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-1">
-                Nama Panggilan Pemilik Akun
+                Nama Panggilan
               </label>
               <input
                 id="nickname"
@@ -284,7 +268,22 @@ export default function RegisterPage() {
                 />
               </div>
             )}
-
+            <div>
+              <label htmlFor="full-name" className="block text-sm font-medium text-gray-700 mb-1">
+                Nama Lengkap Pemilik Akun
+              </label>
+              <input
+                id="full-name"
+                name="full-name"
+                type="text"
+                autoComplete="name"
+                required
+                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                placeholder="Masukkan nama lengkap Anda"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+              />
+            </div>
             {/* Jumlah Pequrban */}
             <div>
               <label htmlFor="jumlah-pequrban" className="block text-sm font-medium text-gray-700 mb-1">
@@ -493,7 +492,7 @@ export default function RegisterPage() {
 
         <p className="mt-8 text-center text-sm text-gray-600">
           Sudah punya akun?{" "}
-          <a href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+          <a href="/qurban/login" className="font-medium text-indigo-600 hover:text-indigo-500">
             Masuk di sini
           </a>
         </p>

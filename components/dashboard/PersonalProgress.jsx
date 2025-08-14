@@ -19,7 +19,7 @@ export default function PersonalProgress({
   if (loadingPersonal) {
     return (
       <div className="bg-white p-6 rounded-xl shadow-lg">
-        <h2 className="text-xl font-bold mb-4 text-green-800">Capaian Pribadi Anda</h2>
+        <h2 className="text-xl font-bold mb-4 text-green-800">Capaian Pribadi Kamu</h2>
         <CardSkeleton />
       </div>
     )
@@ -93,7 +93,7 @@ export default function PersonalProgress({
 
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg text-black">
-      <h2 className="text-xl font-bold mb-4 text-green-800">Capaian Pribadi Anda</h2>
+      <h2 className="text-xl font-bold mb-4 text-green-800">Capaian Pribadi Kamu</h2>
       {/* Info Pequrban & Target */}
       <div className="mb-4 flex flex-col gap-1 text-sm">
         <div>

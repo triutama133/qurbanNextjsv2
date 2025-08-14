@@ -29,7 +29,7 @@ export default function KuisionerPage() {
       localStorage.removeItem("user_id")
       sessionStorage.clear()
     }
-    router.push("/login")
+    router.push("/qurban/login")
   }, [router])
 
   // Handler RADIO:
@@ -134,7 +134,7 @@ const handleLainnyaChange = (idx, value) => {
         setMessage(result.error || "Gagal menyimpan jawaban.")
       } else {
         setMessage("Terima kasih, jawaban Anda sudah direkam!")
-        setTimeout(() => { router.replace("/dashboard") }, 1000)
+        setTimeout(() => { router.replace("/qurban/dashboard") }, 1000)
       }
     } catch (err) {
       setMessage("Gagal menyimpan jawaban. Coba lagi nanti.")

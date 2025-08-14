@@ -1,13 +1,16 @@
 import React from "react"
 
 export default function AdminOverview({ loadingOverview, overallProgramProgress, globalConfig, formatRupiah }) {
+  // Calculate profit/loss
+  const profitLoss = (overallProgramProgress.confirmedAmount ?? 0) - (overallProgramProgress.totalUsedAmount ?? 0) - (overallProgramProgress.totalCosts ?? 0)
+
   return (
     <div className="lg:col-span-3 bg-white p-6 rounded-xl shadow-lg">
       <h2 className="text-xl font-bold mb-4 text-indigo-800">Overview Program</h2>
       {loadingOverview ? (
         <div>Loading...</div>
       ) : overallProgramProgress && globalConfig ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 text-center">
           <div className="bg-indigo-50 p-4 rounded-lg">
             <p className="text-sm text-gray-500">Total Dana Tercatat</p>
             <p className="text-2xl font-bold text-indigo-700">{formatRupiah(overallProgramProgress.totalCollectedAmount)}</p>
@@ -24,7 +27,11 @@ export default function AdminOverview({ loadingOverview, overallProgramProgress,
             <p className="text-sm text-gray-500">Total Biaya Operasional</p>
             <p className="text-2xl font-bold text-gray-700">{formatRupiah(overallProgramProgress.totalCosts)}</p>
           </div>
-          <div className="lg:col-span-4 mt-4">
+          <div className="bg-yellow-50 p-4 rounded-lg">
+            <p className="text-sm text-gray-500">Profit / Loss</p>
+            <p className={`text-2xl font-bold ${profitLoss >= 0 ? 'text-yellow-700' : 'text-red-700'}`}>{formatRupiah(profitLoss)}</p>
+          </div>
+          <div className="lg:col-span-5 mt-4">
             <h3 className="font-semibold text-lg mb-2">Progress Sapi</h3>
             <div className="flex flex-wrap justify-center gap-2">
               {[...Array(overallProgramProgress.cowStatus.fullTarget)].map((_, i) => {

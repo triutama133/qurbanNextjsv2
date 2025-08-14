@@ -78,7 +78,7 @@ export default function AdminLoginPage() {
           setMessage('Login admin berhasil! Mengarahkan ke dashboard admin...');
           setMessageType('success');
           setTimeout(() => {
-            router.push('/admin-dashboard'); // Kita akan membuat halaman admin-dashboard nanti
+            router.push('/qurban/admin-dashboard');
           }, 1500);
         }
       } catch (roleError) {
@@ -171,7 +171,7 @@ export default function AdminLoginPage() {
         </form>
 
         <p className="mt-4 text-center text-sm text-gray-600">
-          <a href="/login" className="font-medium text-indigo-600 hover:text-indigo-500">
+          <a href="/qurban/login" className="font-medium text-indigo-600 hover:text-indigo-500">
             Bukan admin? Login sebagai user
           </a>
         </p>

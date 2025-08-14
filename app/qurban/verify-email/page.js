@@ -32,7 +32,7 @@ function VerifyEmailContent() {
           setMsg("Email berhasil diverifikasi! Silakan login.");
           setMsgType("success");
           setTimeout(() => {
-            router.push("/login");
+            router.push("/qurban/login");
           }, 3000);
         }
         setLoading(false);
