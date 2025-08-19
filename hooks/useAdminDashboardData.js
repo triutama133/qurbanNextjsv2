@@ -53,8 +53,8 @@ export default function useAdminDashboardData() {
         totalUsedAmount: data.totalTabunganTerpakai ?? 0,
         totalCosts: data.totalBiayaOperasional ?? 0,
         cowStatus: data.cowStatus || { fullTarget: 0, green: 0, yellow: 0 },
-        totalUsers: data.totalUsers ?? 0,
-        pendingInitialDeposits: (data.setoranPending ? data.setoranPending.length : 0),
+        totalUsers: data.totalUserTerdaftar ?? 0,
+        verifiedInitialDepositUsers: data.verifiedUserSetoranAwal ?? 0,
       })
       setGlobalConfig({}) // Optional, or map if needed
       setPendingInitialDeposits(data.setoranPending || [])

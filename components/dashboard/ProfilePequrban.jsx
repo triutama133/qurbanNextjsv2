@@ -42,7 +42,7 @@ export default function ProfilePequrban({ profile, loadingProfile }) {
                 <span className="font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800 mr-1 mb-1 inline-block">Normal</span>
               )}
               {/* Status tambahan */}
-              {!profile.IsInitialDepositMade ? (
+              {!profile.IsInitialDepositMade === "TRUE" ? (
                 <span className="font-semibold px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 mr-1 mb-1 inline-block">Belum Setor</span>
               ) : profile.InitialDepositStatus === "Pending" ? (
                 <span className="font-semibold px-2 py-1 rounded-full bg-orange-100 text-orange-800 mr-1 mb-1 inline-block">Pending Verification</span>

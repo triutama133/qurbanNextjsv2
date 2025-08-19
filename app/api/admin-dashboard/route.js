@@ -74,7 +74,7 @@ export async function GET(req) {
   // 9. List user & riwayat transaksi
   const { data: userList } = await supabase
     .from('users')
-    .select('UserId, Nama, Email, StatusSetoran, IsInitialDepositMade, InitialDepositStatus, TargetPribadi');
+    .select('UserId, Nama, Email, StatusSetoran, IsInitialDepositMade, InitialDepositStatus, TargetPribadi, Role');
   const { data: transaksiList } = await supabase
     .from('tabungan')
     .select('*');
@@ -112,10 +112,32 @@ export async function GET(req) {
   }
 
   // 11. Verifikasi transfer pending
-  const { data: transferPending } = await supabase
+  const { data: transferPendingRaw } = await supabase
     .from('transfer_confirmations')
     .select('*')
     .eq('Status', 'Pending');
+
+  // Ambil data user untuk transfer pending
+  let transferPending = [];
+  if (transferPendingRaw && transferPendingRaw.length > 0) {
+    const userIds = transferPendingRaw.map(t => t.UserId).filter(Boolean);
+    let userMap = {};
+    if (userIds.length > 0) {
+      const { data: usersForTransfer } = await supabase
+        .from('users')
+        .select('UserId, Nama, Email')
+        .in('UserId', userIds);
+      userMap = (usersForTransfer || []).reduce((acc, u) => {
+        acc[u.UserId] = u;
+        return acc;
+      }, {});
+    }
+    transferPending = transferPendingRaw.map(t => ({
+      ...t,
+      Nama: userMap[t.UserId]?.Nama || '',
+      Email: userMap[t.UserId]?.Email || '',
+    }));
+  }
 
   // 12. List berita/newsletter
   const { data: newsList } = await supabase
@@ -129,6 +151,11 @@ export async function GET(req) {
     .select('*')
     .eq('IsActive', true)
     .order('CreatedAt', { ascending: false });
+
+  // Hitung total user terdaftar (exclude admin, case-insensitive)
+  const totalUserTerdaftar = (userList || []).filter(u => (u.Role || '').toLowerCase() !== 'admin').length;
+  // Hitung verified user (non-admin, sudah setoran awal dan status Approved, case-insensitive)
+  const verifiedUserSetoranAwal = (userList || []).filter(u => u.IsInitialDepositMade && u.InitialDepositStatus === 'Approved' && (u.Role || '').toLowerCase() !== 'admin').length;
 
   return Response.json({
     totalTabunganTercatat,
@@ -144,6 +171,8 @@ export async function GET(req) {
     setoranPending,
     transferPending,
     newsList,
-    resourceList
+    resourceList,
+    totalUserTerdaftar,
+    verifiedUserSetoranAwal
   });
 }

@@ -78,14 +78,14 @@ export default function AdminDashboard() {
 
   const tabs = [
     // { key: "overview", label: "Overview Program" },
-    { key: "pending", label: "Verifikasi Pending" },
-    { key: "users", label: "Manajemen Pengguna" },
-    { key: "reports", label: "Rekap & Laporan" },
+    { key: "pending", label: "Verification Center" },
+    { key: "users", label: "User Management" },
+    { key: "reports", label: "Reports & Analytics" },
     { key: "helpdesk", label: "Help Desk" },
-    { key: "documents", label: "Dokumen & Sumber Daya" },
-    { key: "milestones", label: "Milestone Program" },
-    { key: "news", label: "Berita & Informasi" },
-    { key: "costs", label: "Biaya Operasional" },
+    { key: "documents", label: "Documents & Resources" },
+    { key: "milestones", label: "Program Milestones" },
+    { key: "news", label: "News & Updates" },
+    { key: "costs", label: "Operational Costs" },
   ]
 
   const renderTabContent = () => {

@@ -81,10 +81,10 @@ export async function POST(request) {
         MetodeTabungan,
         QurbanMethod: QurbanMethod || (MetodeTabungan === "Qurban di Tim" ? "Tim" : "Sendiri"),
         StatusSetoran: "Belum Setor",
-        TargetPribadi, // per pequrban
-        TanggalDaftar: new Date().toISOString(),
-        IsInitialDepositMade: false,
-        InitialDepositStatus: "Pending",
+  TargetPribadi, // per pequrban
+  TanggalDaftar: new Date().toISOString(),
+  IsInitialDepositMade: false,
+  InitialDepositStatus: "Belum Setor",
         StatusPequrban: ["Normal"],
         phone_number: phone_number || null,
         PasswordHash: passwordHash,

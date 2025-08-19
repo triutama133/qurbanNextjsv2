@@ -48,12 +48,12 @@ const PendingVerificationsTab = ({
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Verifikasi Pending</h2>
+        <h2 className="text-2xl font-bold" style={{ color: '#1a202c' }}>Daftar Verifikasi</h2>
         <div className="flex gap-2">
-          <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+          <Badge variant="outline" style={{ backgroundColor: '#fffbe6', color: '#b7791f', borderColor: '#f6e05e' }}>
             {filteredInitialDeposits.length} Setoran Awal
           </Badge>
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+          <Badge variant="outline" style={{ backgroundColor: '#ebf8ff', color: '#2b6cb0', borderColor: '#90cdf4' }}>
             {filteredTransferConfirmations.length} Transfer
           </Badge>
         </div>
@@ -65,10 +65,10 @@ const PendingVerificationsTab = ({
         <div className="space-y-8">
           {/* Verifikasi Setoran Awal */}
           {filteredInitialDeposits.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <div className="rounded-lg border border-gray-200 overflow-hidden" style={{ backgroundColor: '#fff' }}>
+              <div className="px-6 py-4 border-b border-gray-200" style={{ background: 'linear-gradient(90deg, #e6fffa 0%, #f0fff4 100%)' }}>
+                <h3 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#22543d' }}>
+                  <div style={{ width: '8px', height: '8px', backgroundColor: '#38a169', borderRadius: '50%' }}></div>
                   Setoran Awal Pending
                 </h3>
               </div>
@@ -118,8 +118,8 @@ const PendingVerificationsTab = ({
                             <span className="text-gray-400 text-sm">Tidak ada bukti</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex gap-2">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex flex-row flex-wrap gap-2 justify-end items-center">
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
@@ -149,7 +149,7 @@ const PendingVerificationsTab = ({
 
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="destructive">
+                                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white">
                                   <XCircle className="w-4 h-4 mr-1" />
                                   Reject
                                 </Button>
@@ -185,10 +185,10 @@ const PendingVerificationsTab = ({
 
           {/* Verifikasi Konfirmasi Transfer Cicilan */}
           {filteredTransferConfirmations.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+            <div className="rounded-lg border border-gray-200 overflow-hidden" style={{ backgroundColor: '#fff' }}>
+              <div className="px-6 py-4 border-b border-gray-200" style={{ background: 'linear-gradient(90deg, #ebf8ff 0%, #e3e8f0 100%)' }}>
+                <h3 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#2b6cb0' }}>
+                  <div style={{ width: '8px', height: '8px', backgroundColor: '#3182ce', borderRadius: '50%' }}></div>
                   Transfer ke Panitia Pending
                 </h3>
               </div>
@@ -226,6 +226,7 @@ const PendingVerificationsTab = ({
                           <div>
                             <div className="text-sm font-medium text-gray-900">{item.Nama}</div>
                             <div className="text-sm text-gray-500">{item.Email}</div>
+                            <div className="text-xs text-gray-400">ID: {item.UserId}</div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -251,8 +252,8 @@ const PendingVerificationsTab = ({
                             <span className="text-gray-400 text-sm">Tidak ada bukti</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex gap-2">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex flex-row flex-wrap gap-2 justify-end items-center">
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white">
@@ -282,7 +283,7 @@ const PendingVerificationsTab = ({
 
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button size="sm" variant="destructive">
+                                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white">
                                   <XCircle className="w-4 h-4 mr-1" />
                                   Reject
                                 </Button>
