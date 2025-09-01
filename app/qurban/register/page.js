@@ -267,6 +267,8 @@ export default function RegisterPage() {
                       { label: "Intern", value: "Intern" },
                       { label: "Staff", value: "Staff" },
                       { label: "Supervisor", value: "Supervisor" },
+                      { label: "Asisten Manager", value: "Asisten Manager" },
+                      { label: "Manajer", value: "Manajer" },
                       { label: "Direksi/C Level", value: "Direksi/C Level" },
                       { label: "Lainnya", value: "Lainnya" },
                     ]}
@@ -362,6 +364,7 @@ export default function RegisterPage() {
                   <Radio
                     name="metode-tabungan"
                     value="Qurban di Tim"
+                    label="Qurban Bareng Tim Qurban Berdampak"
                     checked={metodeTabungan === "Qurban di Tim"}
                     onChange={(v) => setMetodeTabungan(v)}
                     description={`Target per pequrban: ${formatRupiah(defaultTargetPerPequrban)} | Total: ${formatRupiah(defaultTargetPerPequrban * (jumlahPequrban || 0))}`}
@@ -369,6 +372,13 @@ export default function RegisterPage() {
                   <Radio
                     name="metode-tabungan"
                     value="Qurban Sendiri"
+                    label={
+                      <>
+                        <span>Qurban Personal</span>
+                        <br />
+                        <span className="text-sm">(Ikut Program dengan Target Sendiri)</span>
+                      </>
+                    }
                     checked={metodeTabungan === "Qurban Sendiri"}
                     onChange={(v) => setMetodeTabungan(v)}
                     description="Pakai target custom per pequrban"
@@ -416,6 +426,10 @@ export default function RegisterPage() {
               <div>Target per pequrban: <strong>{formatRupiah(targetPerPequrban)}</strong></div>
               <div>Total target ({jumlahPequrban || 0} pequrban): <strong>{formatRupiah(totalTarget)}</strong></div>
               <div>Rekomendasi tabungan per bulan (12 bulan): <strong>{formatRupiah(monthlyRecommendation)}</strong></div>
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="font-semibold text-gray-800">Benefit Khusus Keluarga Alumni</div>
+                <div className="text-sm text-gray-700">Potongan Rp. 250.000 untuk setiap anggota keluarga yang didaftarkan dengan akun alumni.</div>
+              </div>
             </div>
           </Section>
 
@@ -515,7 +529,7 @@ function Select({ label, options = [], className = "", ...props }) {
   )
 }
 
-function Radio({ name, value, checked, onChange, description }) {
+function Radio({ name, value, checked, onChange, description, label }) {
   return (
     <label className="flex items-start gap-3 rounded-lg border border-gray-200 px-3 py-2 hover:border-indigo-300 transition">
       <input
@@ -527,7 +541,7 @@ function Radio({ name, value, checked, onChange, description }) {
         className="mt-1"
       />
       <div>
-        <div className="text-sm font-medium text-gray-800">{value}</div>
+        <div className="text-sm font-medium text-gray-800">{label ?? value}</div>
         {description && <div className="text-xs text-gray-500">{description}</div>}
       </div>
     </label>

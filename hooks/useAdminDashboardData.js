@@ -60,8 +60,16 @@ export default function useAdminDashboardData() {
       setPendingInitialDeposits(data.setoranPending || [])
       setPendingTransferConfirmations(data.transferPending || [])
 
-      // Users
-      setAllUsers(data.userList || [])
+      // Users - ensure StatusPequrban is present for UI
+      const mappedUsers = (data.userList || []).map(u => ({
+        ...u,
+        StatusPequrban: u.StatusPequrban ?? "N/A",
+      }))
+      // Helpful debug during development
+      try {
+        console.debug('admin-dashboard: loaded users count', mappedUsers.length)
+      } catch (e) {}
+      setAllUsers(mappedUsers)
 
       // Content
       setAllResources(data.resourceList || [])
@@ -129,7 +137,8 @@ export default function useAdminDashboardData() {
       })
 
       if (response.ok) {
-        fetchUsersData()
+  // refresh full admin data after update
+  fetchAllAdminData()
       }
     } catch (error) {
       console.error("Error updating user:", error)
@@ -145,7 +154,7 @@ export default function useAdminDashboardData() {
       })
 
       if (response.ok) {
-        fetchUsersData()
+  fetchAllAdminData()
       }
     } catch (error) {
       console.error("Error deleting user:", error)

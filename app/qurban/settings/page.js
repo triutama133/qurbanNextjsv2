@@ -429,6 +429,8 @@ export default function SettingsPage() {
                         <option value="Intern">Intern</option>
                         <option value="Staff">Staff</option>
                         <option value="Supervisor">Supervisor</option>
+                        <option value="Asisten Manager">Asisten Manager</option>
+                        <option value="Manajer">Manajer</option>
                         <option value="Direksi/C Level">Direksi/C Level</option>
                         <option value="Lainnya">Lainnya</option>
                       </select>

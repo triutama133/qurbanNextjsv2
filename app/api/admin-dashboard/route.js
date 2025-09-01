@@ -74,7 +74,7 @@ export async function GET(req) {
   // 9. List user & riwayat transaksi
   const { data: userList } = await supabase
     .from('users')
-    .select('UserId, Nama, Email, StatusSetoran, IsInitialDepositMade, InitialDepositStatus, TargetPribadi, Role');
+    .select('UserId, Nama, Email, StatusSetoran, IsInitialDepositMade, InitialDepositStatus, TargetPribadi, Role, StatusPequrban');
   const { data: transaksiList } = await supabase
     .from('tabungan')
     .select('*');
@@ -84,7 +84,7 @@ export async function GET(req) {
   // 10. Notifikasi setoran awal pending (hanya user, exclude admin, dan IsInitialDepositMade true)
   const { data: setoranPendingUsers } = await supabase
     .from('users')
-    .select('UserId, Nama, Email, Role, IsInitialDepositMade, InitialDepositStatus')
+    .select('UserId, Nama, Email, Role, IsInitialDepositMade, InitialDepositStatus, StatusPequrban')
     .eq('IsInitialDepositMade', true)
     .eq('InitialDepositStatus', 'Pending')
     .not('Role', 'eq', 'admin');
@@ -122,10 +122,10 @@ export async function GET(req) {
   if (transferPendingRaw && transferPendingRaw.length > 0) {
     const userIds = transferPendingRaw.map(t => t.UserId).filter(Boolean);
     let userMap = {};
-    if (userIds.length > 0) {
+      if (userIds.length > 0) {
       const { data: usersForTransfer } = await supabase
         .from('users')
-        .select('UserId, Nama, Email')
+        .select('UserId, Nama, Email, StatusPequrban')
         .in('UserId', userIds);
       userMap = (usersForTransfer || []).reduce((acc, u) => {
         acc[u.UserId] = u;

@@ -41,6 +41,10 @@ const UserManagementTab = ({
       Email: user.Email || "",
       Role: user.Role || "user",
       InitialDepositStatus: user.InitialDepositStatus || "Pending",
+      // Normalize StatusPequrban which may be stored as array or string in DB
+      StatusPequrban: Array.isArray(user.StatusPequrban)
+        ? user.StatusPequrban[0]
+        : user.StatusPequrban || "Normal",
     })
   }
 
@@ -95,6 +99,9 @@ const UserManagementTab = ({
                     Role
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status Akun
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status Setoran
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -123,6 +130,9 @@ const UserManagementTab = ({
                       <Badge className={getRoleBadge(user.Role)}>{user.Role}</Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
+                      <Badge className="bg-gray-100 text-gray-800 border-gray-200">{user.StatusPequrban || "N/A"}</Badge>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <Badge className={getStatusBadge(user.InitialDepositStatus)}>{user.InitialDepositStatus}</Badge>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -134,7 +144,7 @@ const UserManagementTab = ({
                               Detail
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-slate-200 text-black">
                             <DialogHeader>
                               <DialogTitle>Detail Pengguna</DialogTitle>
                             </DialogHeader>
@@ -142,14 +152,14 @@ const UserManagementTab = ({
                           </DialogContent>
                         </Dialog>
 
-                        <Dialog>
+                        <Dialog open={Boolean(editingUser)} onOpenChange={(open) => { if (!open) setEditingUser(null) }}>
                           <DialogTrigger asChild>
                             <Button size="sm" variant="outline" onClick={() => openEditModal(user)}>
                               <Edit className="w-4 h-4 mr-1" />
                               Edit
                             </Button>
                           </DialogTrigger>
-                          <DialogContent>
+                          <DialogContent className="bg-slate-200 text-black">
                             <DialogHeader>
                               <DialogTitle>Edit Pengguna</DialogTitle>
                             </DialogHeader>
@@ -160,6 +170,7 @@ const UserManagementTab = ({
                                   id="nama"
                                   value={editForm.NamaPequrban || ""}
                                   onChange={(e) => setEditForm({ ...editForm, NamaPequrban: e.target.value })}
+                                  className="bg-white text-black border border-gray-300"
                                 />
                               </div>
                               <div>
@@ -169,44 +180,51 @@ const UserManagementTab = ({
                                   type="email"
                                   value={editForm.Email || ""}
                                   onChange={(e) => setEditForm({ ...editForm, Email: e.target.value })}
+                                  className="bg-white text-black border border-gray-300"
                                 />
                               </div>
                               <div>
                                 <Label htmlFor="role">Role</Label>
-                                <Select
+                                <select
+                                  id="role"
                                   value={editForm.Role}
-                                  onValueChange={(value) => setEditForm({ ...editForm, Role: value })}
+                                  onChange={(e) => setEditForm({ ...editForm, Role: e.target.value })}
+                                  className="w-full rounded border border-gray-300 bg-slate-200 text-black px-3 py-2"
                                 >
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="user">User</SelectItem>
-                                    <SelectItem value="admin">Admin</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                  <option value="user">User</option>
+                                  <option value="admin">Admin</option>
+                                </select>
                               </div>
                               <div>
                                 <Label htmlFor="status">Status Setoran Awal</Label>
-                                <Select
+                                <select
+                                  id="status"
                                   value={editForm.InitialDepositStatus}
-                                  onValueChange={(value) => setEditForm({ ...editForm, InitialDepositStatus: value })}
+                                  onChange={(e) => setEditForm({ ...editForm, InitialDepositStatus: e.target.value })}
+                                  className="w-full rounded border border-gray-300 bg-slate-200 text-black px-3 py-2"
                                 >
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Pending">Pending</SelectItem>
-                                    <SelectItem value="Approved">Approved</SelectItem>
-                                    <SelectItem value="Rejected">Rejected</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                  <option value="Pending">Pending</option>
+                                  <option value="Approved">Approved</option>
+                                  <option value="Rejected">Rejected</option>
+                                </select>
+                              </div>
+                              <div>
+                                <Label htmlFor="statusPequrban">Status Pequrban</Label>
+                                <select
+                                  id="statusPequrban"
+                                  value={editForm.StatusPequrban}
+                                  onChange={(e) => setEditForm({ ...editForm, StatusPequrban: e.target.value })}
+                                  className="w-full rounded border border-gray-300 bg-slate-200 text-black px-3 py-2"
+                                >
+                                  <option value="Normal">Normal</option>
+                                  <option value="Alumni">Alumni</option>
+                                </select>
                               </div>
                               <div className="flex gap-2 pt-4">
-                                <Button onClick={handleSaveEdit} className="flex-1">
+                                <Button onClick={handleSaveEdit} className="flex-1 bg-green-600 hover:bg-green-700 text-white">
                                   Simpan Perubahan
                                 </Button>
-                                <Button variant="outline" onClick={() => setEditingUser(null)} className="flex-1">
+                                <Button onClick={() => setEditingUser(null)} className="flex-1 bg-red-600 hover:bg-red-700 text-white">
                                   Batal
                                 </Button>
                               </div>
