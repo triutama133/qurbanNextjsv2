@@ -120,4 +120,28 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Ensure form controls use theme variables for background/foreground in both light and dark modes.
+     Use !important so component-level utility classes (e.g. text-black) don't make fields unreadable in dark theme. */
+  input,
+  textarea,
+  select {
+    background: var(--color-input) !important;
+    color: var(--color-foreground) !important;
+    border-color: var(--color-border) !important;
+    caret-color: var(--color-primary) !important;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-muted-foreground) !important;
+    opacity: 1 !important;
+  }
+
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+  }
 }

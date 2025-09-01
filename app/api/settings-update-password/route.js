@@ -5,7 +5,10 @@ const supabaseAdmin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process
 
 export async function POST(request) {
   try {
-    const { userId, currentPassword, newPassword } = await request.json()
+    const body = await request.json()
+    const userId = body.userId || body.UserId || body.userid
+    const currentPassword = body.currentPassword || body.CurrentPassword || body.current_password
+    const newPassword = body.newPassword || body.NewPassword || body.new_password
     if (!userId || !currentPassword || !newPassword) {
       return NextResponse.json({ error: "Semua field wajib diisi." }, { status: 400 })
     }

@@ -1,302 +1,337 @@
 "use client"
 
-import { useState } from "react"
-import supabase from "@/lib/supabase"
+import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 
 export default function RegisterPage() {
+  // SECTION 1 — Data Pemilik Akun
   const [fullName, setFullName] = useState("")
-  const [jumlahPequrban, setJumlahPequrban] = useState(1)
-  const [pequrbanNames, setPequrbanNames] = useState([""])
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
-  const [metodeTabungan, setMetodeTabungan] = useState("Qurban di Tim") // "Qurban di Tim" atau "Qurban Sendiri"
-  const [customTarget, setCustomTarget] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState("")
-  const [messageType, setMessageType] = useState("")
-  const [phoneNumber, setPhoneNumber] = useState("")
   const [nickname, setNickname] = useState("")
+  const [email, setEmail] = useState("")
+  const [phoneNumber, setPhoneNumber] = useState("")
   const [province, setProvince] = useState("")
   const [city, setCity] = useState("")
+  const [incomeRange, setIncomeRange] = useState("")
   const [job, setJob] = useState("")
-  const [maritalStatus, setMaritalStatus] = useState("")
+  const [jobOther, setJobOther] = useState("")
+  const [jobPosition, setJobPosition] = useState("")
+  const [jobPositionOther, setJobPositionOther] = useState("")
+  const [maritalStatus, setMaritalStatus] = useState("") // "Single" | "Married" | "Previously Married"
   const [childrenCount, setChildrenCount] = useState("")
+
+  // SECTION 2 — Data Pequrban
+  const [jumlahPequrban, setJumlahPequrban] = useState(1)
+  const [pequrbanNames, setPequrbanNames] = useState([""])
+  const [metodeTabungan, setMetodeTabungan] = useState("Qurban di Tim") // "Qurban di Tim" | "Qurban Sendiri"
+  const [customTarget, setCustomTarget] = useState("")
+
+  // SECTION 3 — Password
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+
+  // UX state
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState("")
+  const [messageType, setMessageType] = useState("") // "error" | "success"
   const router = useRouter()
 
-  const formatRupiah = (amount) => {
-    return new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-      minimumFractionDigits: 0,
-    }).format(amount)
-  }
+  // ===== Helpers =====
+  const formatRupiah = (amount) =>
+    new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(amount || 0)
 
-  const calculateMonthlyRecommendation = (target) => {
-    const months = 12 // Asumsi 12 bulan untuk mencapai target
-    return Math.ceil(target / months)
-  }
+  const parseNumber = (str) => Number.parseInt(String(str).replace(/[^0-9]/g, ""), 10) || 0
 
+  const defaultTargetPerPequrban = 2650000
+  const targetPerPequrban = useMemo(() => {
+    if (metodeTabungan === "Qurban di Tim") return defaultTargetPerPequrban
+    return parseNumber(customTarget)
+  }, [metodeTabungan, customTarget])
+
+  const totalTarget = useMemo(() => targetPerPequrban * (jumlahPequrban || 0), [targetPerPequrban, jumlahPequrban])
+
+  const monthlyRecommendation = useMemo(() => {
+    const months = 12
+    return Math.ceil((totalTarget || 0) / months)
+  }, [totalTarget])
+
+  // ===== Submit =====
   const handleSignUp = async (e) => {
     e.preventDefault()
     setLoading(true)
     setMessage("")
     setMessageType("")
 
+    // --- Validasi Section 1 ---
+    if (!fullName.trim()) return endWithError("Nama lengkap wajib diisi.")
+    if (!nickname.trim()) return endWithError("Nama panggilan wajib diisi.")
+    if (!email.trim()) return endWithError("Email wajib diisi.")
+    if (!phoneNumber.trim()) return endWithError("No HP/WA aktif wajib diisi.")
+    if (!province.trim()) return endWithError("Provinsi domisili wajib diisi.")
+    if (!city.trim()) return endWithError("Kota domisili wajib diisi.")
+    if (!job) return endWithError("Pekerjaan wajib dipilih.")
+    if (job === "Lainnya" && !jobOther.trim()) return endWithError("Detail pekerjaan wajib diisi.")
+    if (job !== "Tidak Bekerja") {
+      if (!jobPosition) return endWithError("Posisi di pekerjaan wajib dipilih.")
+      if (jobPosition === "Lainnya" && !jobPositionOther.trim()) return endWithError("Detail posisi wajib diisi.")
+    }
+    if (!maritalStatus) return endWithError("Status pernikahan wajib dipilih.")
+  if (!incomeRange) return endWithError("Range pendapatan wajib dipilih.")
 
-    // Validasi field baru
-    if (!fullName.trim()) {
-      setMessage("Nama lengkap wajib diisi."); setMessageType("error"); setLoading(false); return;
-    }
-    if (!nickname.trim()) {
-      setMessage("Nama panggilan wajib diisi."); setMessageType("error"); setLoading(false); return;
-    }
-    if (!phoneNumber.trim()) {
-      setMessage("No WA Aktif wajib diisi."); setMessageType("error"); setLoading(false); return;
-    }
-    if (!province.trim()) {
-      setMessage("Provinsi domisili wajib diisi."); setMessageType("error"); setLoading(false); return;
-    }
-    if (!city.trim()) {
-      setMessage("Kota domisili wajib diisi."); setMessageType("error"); setLoading(false); return;
-    }
-    if (!job.trim()) {
-      setMessage("Pekerjaan wajib diisi."); setMessageType("error"); setLoading(false); return;
-    }
-    if (!maritalStatus.trim()) {
-      setMessage("Status pernikahan wajib diisi."); setMessageType("error"); setLoading(false); return;
-    }
-    if (maritalStatus === "Sudah Menikah" && (!childrenCount || isNaN(childrenCount) || Number(childrenCount) < 0)) {
-      setMessage("Jumlah anak wajib diisi dan tidak boleh negatif."); setMessageType("error"); setLoading(false); return;
-    }
-    if (!jumlahPequrban || jumlahPequrban < 1) {
-      setMessage("Jumlah pequrban minimal 1."); setMessageType("error"); setLoading(false); return;
-    }
-    if (pequrbanNames.length !== jumlahPequrban || pequrbanNames.some((n) => !n.trim())) {
-      setMessage("Semua nama pequrban harus diisi."); setMessageType("error"); setLoading(false); return;
-    }
-    if (password !== confirmPassword) {
-      setMessage("Password dan konfirmasi password tidak cocok."); setMessageType("error"); setLoading(false); return;
-    }
-    // Validasi target custom jika qurban sendiri
-    let targetPerPequrban = 2650000 // Default untuk Qurban di Tim
-    if (metodeTabungan === "Qurban Sendiri") {
-      const customAmount = Number.parseInt(customTarget.replace(/[^0-9]/g, ""))
-      if (!customAmount || customAmount < 500000) {
-        setMessage("Target tabungan minimal Rp 500.000 per pequrban untuk Qurban Sendiri."); setMessageType("error"); setLoading(false); return;
+    if (maritalStatus !== "Single") {
+      const n = Number(childrenCount)
+      if (!(childrenCount !== "" && !Number.isNaN(n) && n >= 0)) {
+        return endWithError("Jumlah anak wajib diisi (0 jika belum ada) dan tidak boleh negatif.")
       }
-      targetPerPequrban = customAmount
     }
-    const totalTarget = targetPerPequrban * jumlahPequrban
+
+    // --- Validasi Section 2 ---
+    if (!jumlahPequrban || jumlahPequrban < 1) return endWithError("Jumlah pequrban minimal 1.")
+    if (pequrbanNames.length !== jumlahPequrban || pequrbanNames.some((n) => !n.trim()))
+      return endWithError("Semua nama pequrban harus diisi.")
+
+    if (metodeTabungan === "Qurban Sendiri") {
+      const v = parseNumber(customTarget)
+      if (v < 500000) return endWithError("Target tabungan custom minimal Rp 500.000 per pequrban.")
+    }
+
+    // --- Validasi Section 3 ---
+    if (!password.trim()) return endWithError("Password wajib diisi.")
+    if (password !== confirmPassword) return endWithError("Password dan konfirmasi password tidak cocok.")
 
     // Generate userId (UUID v4)
-    const userId = crypto.randomUUID ? crypto.randomUUID() : ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c=>(c^crypto.getRandomValues(new Uint8Array(1))[0]&15>>c/4).toString(16));
+    const userId = crypto.randomUUID
+      ? crypto.randomUUID()
+      : ([1e7]+-1e3+-4e3+-8e3+-1e11)
+          .replace(/[018]/g, c => (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16))
 
-    // Log payload ke console sebelum request
-    console.log("Payload:", {
+    const normalizedChildren =
+      maritalStatus === "Single" ? 0 : (childrenCount === "" ? 0 : Number(childrenCount))
+
+    // Build pekerjaan/posisi values
+    const pekerjaanValue = job === "Lainnya" && jobOther ? `Lainnya - ${jobOther}` : job
+    const posisiPekerjaanValue = job === "Tidak Bekerja"
+      ? "" // penting: kirim string kosong ketika tidak bekerja
+      : jobPosition === "Lainnya"
+      ? (jobPositionOther ? `Lainnya - ${jobPositionOther}` : "")
+      : jobPosition
+
+    const payload = {
       UserId: userId,
       Nama: fullName,
       Nickname: nickname,
+      Email: email,
       phone_number: phoneNumber,
       Provinsi: province,
       Kota: city,
-      Pekerjaan: job,
+  RangePendapatan: incomeRange,
+      Pekerjaan: pekerjaanValue,
+      PosisiPekerjaan: posisiPekerjaanValue,
       StatusPernikahan: maritalStatus,
-      JumlahAnak: maritalStatus === "Sudah Menikah" ? childrenCount : 0,
-      NamaPequrban: pequrbanNames,
+      JumlahAnak: normalizedChildren,
       JumlahPequrban: jumlahPequrban,
-      Email: email,
+      NamaPequrban: pequrbanNames,
       MetodeTabungan: metodeTabungan,
       TargetPribadi: targetPerPequrban,
-    })
-    const response = await fetch("/api/register-user", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        UserId: userId,
-        Nama: fullName,
-        Nickname: nickname,
-        phone_number: phoneNumber,
-        Provinsi: province,
-        Kota: city,
-        Pekerjaan: job,
-        StatusPernikahan: maritalStatus,
-        JumlahAnak: maritalStatus === "Sudah Menikah" ? childrenCount : 0,
-        NamaPequrban: pequrbanNames,
-        JumlahPequrban: jumlahPequrban,
-        Email: email,
-        MetodeTabungan: metodeTabungan,
-        TargetPribadi: targetPerPequrban,
-        Password: password,
-      }),
-    })
-
-    const result = await response.json()
-
-    if (response.status === 409) {
-      setMessage("Email ini sudah terdaftar di sistem. Silakan login.")
-      setMessageType("error")
-      setLoading(false)
-      return
+      Password: password,
     }
 
-    if (!response.ok || result.error) {
-      setMessage(result.error || "Gagal menyimpan data profil.")
-      setMessageType("error")
-      setLoading(false)
-      return
-    }
+    try {
+      console.log("[Register][client] payload:", payload)
 
-    setMessage("Pendaftaran berhasil! Silakan login.")
-    setMessageType("success")
-    setTimeout(() => {
-      router.push("/qurban/login")
-    }, 5000)
+      const res = await fetch("/api/register-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      const result = await res.json().catch(() => ({}))
+
+      if (res.status === 409) return endWithError("Email ini sudah terdaftar di sistem. Silakan login.")
+      if (!res.ok || result.error) return endWithError(result.error || "Gagal menyimpan data profil.")
+
+      setMessage("Pendaftaran berhasil! Mengalihkan ke halaman login…")
+      setMessageType("success")
+      setTimeout(() => router.push("/qurban/login"), 1500)
+    } catch (err) {
+      console.error(err)
+      endWithError("Terjadi kesalahan jaringan. Coba lagi.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function endWithError(msg) {
+    setMessage(msg)
+    setMessageType("error")
     setLoading(false)
   }
 
+  // ===== UI =====
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Daftar Akun Baru</h2>
-          <p className="mt-2 text-center text-sm text-gray-600">Daftar untuk ikut program tabungan qurban</p>
+    <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white py-10 px-4">
+      <div className="mx-auto w-full max-w-3xl">
+        {/* Header */}
+        <div className="mb-6 text-center">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Daftar Akun Baru</h1>
+          <p className="mt-1 text-gray-600">Bergabung untuk ikut program tabungan qurban</p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSignUp}>
-          <div className="rounded-md shadow-sm space-y-4">
-            {/* Nama panggilan */}
-            <div>
-              <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-1">
-                Nama Panggilan
-              </label>
-              <input
-                id="nickname"
-                name="nickname"
-                type="text"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Masukkan nama panggilan Anda"
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-              />
-            </div>
-            {/* Provinsi Domisili */}
-            <div>
-              <label htmlFor="province" className="block text-sm font-medium text-gray-700 mb-1">
-                Provinsi Domisili
-              </label>
-              <input
-                id="province"
-                name="province"
-                type="text"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Masukkan provinsi domisili"
-                value={province}
-                onChange={(e) => setProvince(e.target.value)}
-              />
-            </div>
-            {/* Kota Domisili */}
-            <div>
-              <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
-                Kota Domisili
-              </label>
-              <input
-                id="city"
-                name="city"
-                type="text"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Masukkan kota domisili"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-              />
-            </div>
-            {/* Pekerjaan */}
-            <div>
-              <label htmlFor="job" className="block text-sm font-medium text-gray-700 mb-1">
-                Pekerjaan
-              </label>
-              <input
-                id="job"
-                name="job"
-                type="text"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Masukkan pekerjaan"
-                value={job}
-                onChange={(e) => setJob(e.target.value)}
-              />
-            </div>
-            {/* Status Pernikahan */}
-            <div>
-              <label htmlFor="marital-status" className="block text-sm font-medium text-gray-700 mb-1">
-                Status Pernikahan
-              </label>
-              <select
-                id="marital-status"
-                name="marital-status"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                value={maritalStatus}
-                onChange={(e) => setMaritalStatus(e.target.value)}
-              >
-                <option value="" disabled>Status Pernikahan</option>
-                <option value="Belum Menikah">Belum Menikah</option>
-                <option value="Sudah Menikah">Sudah Menikah</option>
-              </select>
-            </div>
-            {/* Jumlah Anak (jika sudah menikah) */}
-            {maritalStatus === "Sudah Menikah" && (
-              <div>
-                <label htmlFor="children-count" className="block text-sm font-medium text-gray-700 mb-1">
-                  Jumlah Anak
-                </label>
-                <input
-                  id="children-count"
-                  name="children-count"
-                  type="number"
-                  min={0}
-                  required
-                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                  placeholder="Masukkan jumlah anak"
-                  value={childrenCount}
-                  onChange={(e) => setChildrenCount(e.target.value)}
-                />
-              </div>
-            )}
-            <div>
-              <label htmlFor="full-name" className="block text-sm font-medium text-gray-700 mb-1">
-                Nama Lengkap Pemilik Akun
-              </label>
-              <input
-                id="full-name"
-                name="full-name"
-                type="text"
-                autoComplete="name"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Masukkan nama lengkap Anda"
+
+        <form onSubmit={handleSignUp} className="space-y-6">
+          {/* SECTION 1: Data Pemilik Akun */}
+          <Section title="1) Data Pemilik Akun" subtitle="Isi identitas dasar Anda">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="Nama Lengkap"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                placeholder="Nama sesuai KTP"
+                required
               />
+              <Input
+                label="Nama Panggilan"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="Nama panggilan Anda"
+                required
+              />
+              <Input
+                label="Alamat Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="contoh@domain.com"
+                required
+              />
+              <Input
+                label="No HP/WA Aktif"
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9+]/g, ""))}
+                placeholder="08xxxxxxxxxx"
+                required
+              />
+              <Input
+                label="Provinsi Domisili"
+                value={province}
+                onChange={(e) => setProvince(e.target.value)}
+                placeholder="Contoh: Jawa Barat"
+                required
+              />
+              <Input
+                label="Kota Domisili"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="Contoh: Bandung"
+                required
+              />
+
+
+              <Select
+                label="Pekerjaan"
+                value={job}
+                onChange={e => setJob(e.target.value)}
+                required
+                options={[
+                  { label: "Pilih pekerjaan…", value: "", disabled: true },
+                  { label: "PNS", value: "PNS" },
+                  { label: "P3K", value: "P3K" },
+                  { label: "Pejabat Publik", value: "Pejabat Publik" },
+                  { label: "Pegawai BUMN/BUMD", value: "Pegawai BUMN/BUMD" },
+                  { label: "Pegawai Swasta", value: "Pegawai Swasta" },
+                  { label: "Profesional/Freelancer", value: "Profesional/Freelancer" },
+                  { label: "Dosen/Guru", value: "Dosen/Guru" },
+                  { label: "Pegawai NGO", value: "Pegawai NGO" },
+                  { label: "Pengusaha", value: "Pengusaha" },
+                  { label: "Tidak Bekerja", value: "Tidak Bekerja" },
+                  { label: "Lainnya", value: "Lainnya" },
+                ]}
+              />
+              {job === "Lainnya" && (
+                <Input
+                  label="Detail Pekerjaan"
+                  value={jobOther}
+                  onChange={e => setJobOther(e.target.value)}
+                  placeholder="Isi pekerjaan Anda"
+                  required
+                />
+              )}
+              {job !== "Tidak Bekerja" && (
+                <>
+                  <Select
+                    label="Posisi di Pekerjaan"
+                    value={jobPosition}
+                    onChange={e => setJobPosition(e.target.value)}
+                    required
+                    options={[
+                      { label: "Pilih posisi…", value: "", disabled: true },
+                      { label: "Intern", value: "Intern" },
+                      { label: "Staff", value: "Staff" },
+                      { label: "Supervisor", value: "Supervisor" },
+                      { label: "Direksi/C Level", value: "Direksi/C Level" },
+                      { label: "Lainnya", value: "Lainnya" },
+                    ]}
+                  />
+                  {jobPosition === "Lainnya" && (
+                    <Input
+                      label="Detail Posisi"
+                      value={jobPositionOther}
+                      onChange={e => setJobPositionOther(e.target.value)}
+                      placeholder="Isi posisi Anda"
+                      required
+                    />
+                  )}
+                </>
+              )}
+
+              <Select
+                label="Range Pendapatan"
+                value={incomeRange}
+                onChange={(e) => setIncomeRange(e.target.value)}
+                required
+                options={[
+                  { label: "Pilih range pendapatan…", value: "", disabled: true },
+                  { label: "< 3 juta", value: "< 3 juta" },
+                  { label: "3 - 4,5 juta", value: "3 - 4,5 juta" },
+                  { label: "4,5 - 6 juta", value: "4,5 - 6 juta" },
+                  { label: "6,5 - 9 juta", value: "6,5 - 9 juta" },
+                  { label: "> 9 juta", value: "> 9 juta" },
+                ]}
+              />
+
+              <Select
+                label="Status Pernikahan"
+                value={maritalStatus}
+                onChange={(e) => setMaritalStatus(e.target.value)}
+                required
+                options={[
+                  { label: "Pilih status…", value: "", disabled: true },
+                  { label: "Single", value: "Single" },
+                  { label: "Married", value: "Married" },
+                  { label: "Previously Married", value: "Previously Married" },
+                ]}
+              />
+              {(maritalStatus === "Married" || maritalStatus === "Previously Married") && (
+                <Input
+                  label="Jumlah Anak"
+                  type="number"
+                  min={0}
+                  value={childrenCount}
+                  onChange={(e) => setChildrenCount(e.target.value)}
+                  placeholder="0 jika belum ada"
+                  required
+                />
+              )}
             </div>
-            {/* Jumlah Pequrban */}
-            <div>
-              <label htmlFor="jumlah-pequrban" className="block text-sm font-medium text-gray-700 mb-1">
-                Jumlah Pequrban
-              </label>
-              <input
-                id="jumlah-pequrban"
-                name="jumlah-pequrban"
+          </Section>
+
+          {/* SECTION 2: Data Pequrban */}
+          <Section title="2) Data Pequrban" subtitle="Isi data pequrban dan pilih metode qurban">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="Jumlah Pequrban"
                 type="number"
                 min={1}
                 max={10}
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 value={jumlahPequrban === 0 ? "" : jumlahPequrban}
                 onChange={(e) => {
                   const raw = e.target.value
@@ -306,7 +341,7 @@ export default function RegisterPage() {
                     return
                   }
                   let val = Number(raw)
-                  if (isNaN(val)) val = 0
+                  if (Number.isNaN(val)) val = 0
                   if (val > 10) val = 10
                   setJumlahPequrban(val)
                   setPequrbanNames((prev) => {
@@ -319,184 +354,182 @@ export default function RegisterPage() {
                     return arr
                   })
                 }}
+                required
               />
+              <div className="sm:col-span-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Metode Qurban</label>
+                <div className="space-y-2">
+                  <Radio
+                    name="metode-tabungan"
+                    value="Qurban di Tim"
+                    checked={metodeTabungan === "Qurban di Tim"}
+                    onChange={(v) => setMetodeTabungan(v)}
+                    description={`Target per pequrban: ${formatRupiah(defaultTargetPerPequrban)} | Total: ${formatRupiah(defaultTargetPerPequrban * (jumlahPequrban || 0))}`}
+                  />
+                  <Radio
+                    name="metode-tabungan"
+                    value="Qurban Sendiri"
+                    checked={metodeTabungan === "Qurban Sendiri"}
+                    onChange={(v) => setMetodeTabungan(v)}
+                    description="Pakai target custom per pequrban"
+                  />
+                </div>
+              </div>
+
+              {metodeTabungan === "Qurban Sendiri" && (
+                <div className="sm:col-span-2">
+                  <Input
+                    label="Target Tabungan Custom (per pequrban)"
+                    value={customTarget}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, "")
+                      const formatted = value ? Number.parseInt(value, 10).toLocaleString("id-ID") : ""
+                      setCustomTarget(formatted)
+                    }}
+                    placeholder="Contoh: 2.500.000"
+                    required
+                  />
+                </div>
+              )}
             </div>
-            {/* Nama-nama Pequrban */}
-            {pequrbanNames.map((name, idx) => (
-              <div key={idx}>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nama Pequrban #{idx + 1}
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                  placeholder={`Masukkan nama pequrban ke-${idx + 1}`}
+
+            {/* Nama Pequrban */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {pequrbanNames.map((name, idx) => (
+                <Input
+                  key={idx}
+                  label={`Nama Pequrban #${idx + 1}`}
                   value={name}
                   onChange={(e) => {
                     const arr = [...pequrbanNames]
                     arr[idx] = e.target.value
                     setPequrbanNames(arr)
                   }}
-                />
-              </div>
-            ))}
-            <div>
-              <label htmlFor="email-address" className="block text-sm font-medium text-gray-700 mb-1">
-                Alamat Email
-              </label>
-              <input
-                id="email-address"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="contoh@domain.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="phone-number" className="block text-sm font-medium text-gray-700 mb-1">
-                Nomor WA Aktif
-              </label>
-              <input
-                id="phone-number"
-                name="phone-number"
-                type="tel"
-                autoComplete="tel"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="08xxxxxxxxxx"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value.replace(/[^0-9+]/g, ""))}
-              />
-            </div>
-
-            {/* Metode Qurban Selection */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Metode Qurban</label>
-              <div className="space-y-2">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="metode-tabungan"
-                    value="Qurban di Tim"
-                    checked={metodeTabungan === "Qurban di Tim"}
-                    onChange={(e) => setMetodeTabungan(e.target.value)}
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-gray-700">Qurban di Tim (Target per pequrban: {formatRupiah(2650000)}, Total: {formatRupiah(2650000 * jumlahPequrban)})</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="metode-tabungan"
-                    value="Qurban Sendiri"
-                    checked={metodeTabungan === "Qurban Sendiri"}
-                    onChange={(e) => setMetodeTabungan(e.target.value)}
-                    className="mr-2"
-                  />
-                  <span className="text-sm text-gray-700">Qurban Sendiri (Target Custom x {jumlahPequrban})</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Custom Target Input for Qurban Sendiri */}
-            {metodeTabungan === "Qurban Sendiri" && (
-              <div>
-                <label htmlFor="custom-target" className="block text-sm font-medium text-gray-700 mb-1">
-                  Target Tabungan Custom (per pequrban)
-                </label>
-                <input
-                  id="custom-target"
-                  name="custom-target"
-                  type="text"
+                  placeholder={`Nama pequrban ke-${idx + 1}`}
                   required
-                  className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                  placeholder="Masukkan target tabungan per pequrban (contoh. Rp 2.500.000)"
-                  value={customTarget}
-                  onChange={(e) => {
-                    const value = e.target.value.replace(/[^0-9]/g, "")
-                    const formatted = value ? Number.parseInt(value, 10).toLocaleString("id-ID") : ""
-                    setCustomTarget(formatted)
-                  }}
                 />
-                {customTarget && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Target per pequrban: {formatRupiah(Number.parseInt(customTarget.replace(/[^0-9]/g, "")) || 0)}<br />
-                    Total target: {formatRupiah((Number.parseInt(customTarget.replace(/[^0-9]/g, "")) || 0) * jumlahPequrban)}<br />
-                    Rekomendasi tabungan per bulan: {formatRupiah(
-                      calculateMonthlyRecommendation((Number.parseInt(customTarget.replace(/[^0-9]/g, "")) || 0) * jumlahPequrban)
-                    )}
-                  </p>
-                )}
-              </div>
-            )}
+              ))}
+            </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
+            {/* Ringkasan Target */}
+            <div className="mt-4 rounded-lg border bg-gray-50 p-4 text-sm text-gray-700">
+              <div>Target per pequrban: <strong>{formatRupiah(targetPerPequrban)}</strong></div>
+              <div>Total target ({jumlahPequrban || 0} pequrban): <strong>{formatRupiah(totalTarget)}</strong></div>
+              <div>Rekomendasi tabungan per bulan (12 bulan): <strong>{formatRupiah(monthlyRecommendation)}</strong></div>
+            </div>
+          </Section>
+
+          {/* SECTION 3: Password */}
+          <Section title="3) Keamanan Akun" subtitle="Setel password Anda">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="Password"
                 type="password"
-                autoComplete="new-password"
-                required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Masukkan password Anda"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-1">
-                Konfirmasi Password
-              </label>
-              <input
-                id="confirm-password"
-                name="confirm-password"
-                type="password"
-                autoComplete="new-password"
+                placeholder="Minimal 6 karakter"
                 required
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Ketik ulang password Anda"
+              />
+              <Input
+                label="Konfirmasi Password"
+                type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Ulangi password"
+                required
               />
             </div>
-          </div>
+          </Section>
 
+          {/* Status message */}
           {message && (
             <div
-              className={`py-2 px-3 rounded-md text-sm ${
-                messageType === "error" ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"
+              className={`rounded-lg px-4 py-3 text-sm ${
+                messageType === "error" ? "bg-red-50 text-red-700 border border-red-200" : "bg-green-50 text-green-700 border border-green-200"
               }`}
             >
               {message}
             </div>
           )}
 
-          <div>
+          {/* Submit */}
+          <div className="flex items-center justify-between gap-3">
+            <a href="/qurban/login" className="text-sm text-indigo-600 hover:underline">
+              Sudah punya akun? Masuk
+            </a>
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-2.5 text-white font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
             >
-              {loading ? "Memproses..." : "Daftar"}
+              {loading ? "Memproses…" : "Daftar"}
             </button>
           </div>
         </form>
-
-        <p className="mt-8 text-center text-sm text-gray-600">
-          Sudah punya akun?{" "}
-          <a href="/qurban/login" className="font-medium text-indigo-600 hover:text-indigo-500">
-            Masuk di sini
-          </a>
-        </p>
       </div>
     </div>
+  )
+}
+
+/* ===================== Sub Components ===================== */
+
+function Section({ title, subtitle, children }) {
+  return (
+    <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="border-b border-gray-100 px-5 py-4">
+        <h2 className="text-base sm:text-lg font-semibold text-gray-900">{title}</h2>
+        {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
+      </div>
+      <div className="px-5 py-5">{children}</div>
+    </section>
+  )
+}
+
+function Input({ label, className = "", ...props }) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
+      <input
+        className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+        {...props}
+      />
+    </label>
+  )
+}
+
+function Select({ label, options = [], className = "", ...props }) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
+      <select
+        className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+        {...props}
+      >
+        {options.map((opt, i) => (
+          <option key={i} value={opt.value} disabled={opt.disabled}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+function Radio({ name, value, checked, onChange, description }) {
+  return (
+    <label className="flex items-start gap-3 rounded-lg border border-gray-200 px-3 py-2 hover:border-indigo-300 transition">
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1"
+      />
+      <div>
+        <div className="text-sm font-medium text-gray-800">{value}</div>
+        {description && <div className="text-xs text-gray-500">{description}</div>}
+      </div>
+    </label>
   )
 }

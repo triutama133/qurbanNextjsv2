@@ -46,7 +46,7 @@ export async function POST(request) {
     }
 
     // Kirim email verifikasi via Resend
-    const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/verify-email?token=${token}`;
+    const verifyUrl = `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}/qurban/verify-email?token=${token}`;
     const resend = new Resend(process.env.RESEND_API_KEY);
     await resend.emails.send({
       from: "noreply@newmo.space",

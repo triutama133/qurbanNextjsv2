@@ -13,13 +13,17 @@ export default function KuisionerPage() {
   const [message, setMessage] = useState("")
   const [page, setPage] = useState(0)
   const cardContainerRef = useRef(null)
+  const lastPageRef = useRef(0)
   const router = useRouter()
 
-  // Scroll ke atas card container saat pindah halaman
+  // Scroll ke atas card container hanya saat pindah maju (next/jump forward)
   useEffect(() => {
-    if (cardContainerRef.current) {
+    if (!cardContainerRef.current) return
+    const prev = lastPageRef.current ?? 0
+    if (page > prev) {
       cardContainerRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
     }
+    lastPageRef.current = page
   }, [page])
 
   // Logout
@@ -175,9 +179,6 @@ const handleLainnyaChange = (idx, value) => {
 
           {/* Heading */}
           <div className="flex flex-col items-center gap-2 mt-2">
-            <div className="bg-indigo-100 rounded-full p-3 shadow-md mb-1">
-              <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="text-indigo-600"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            </div>
             <h1 className="text-4xl font-extrabold text-center text-indigo-800 mb-1 tracking-tight drop-shadow">Survey Pequrban</h1>
             <p className="text-center text-lg text-gray-800 mb-2 font-medium">Bantu kami mengenal kebutuhanmu lebih dalam</p>
           </div>
@@ -255,10 +256,26 @@ const handleLainnyaChange = (idx, value) => {
             })}
           </div>
 
+          {/* Page jump buttons */}
+          <div className="flex items-center gap-2 justify-center mt-2">
+            {Array.from({ length: totalPages }).map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                onMouseDown={(e) => { if (i < page) e.preventDefault() }}
+                onClick={() => setPage(i)}
+                className={`px-3 py-1 rounded-md text-sm ${page === i ? 'bg-indigo-600 text-white' : 'bg-white border text-gray-700'}`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+
           {/* Pagination */}
           <div className="flex justify-between items-center gap-4 px-2 md:px-0 mt-2">
             <button
               type="button"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
               className="px-5 py-2 rounded-lg font-semibold bg-gray-100 text-gray-700 shadow hover:bg-gray-200 transition disabled:opacity-50 disabled:cursor-not-allowed"

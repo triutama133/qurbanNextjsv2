@@ -91,9 +91,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8 px-2 sm:px-6 lg:px-8">
       {/* Desktop: 2 columns, Mobile: tab */}
       <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8 px-2 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md bg-white rounded-xl shadow-lg border-t-8 border-[#E53935] p-8 flex flex-col items-center">
+        <div className="w-full max-w-md bg-white rounded-xl shadow-lg border-t-8 border-emerald-600 p-8 flex flex-col items-center">
           <img src="/logo.png" alt="Logo Qurban" className="h-40 w-auto mb-4" style={{maxWidth: 240, objectFit: 'contain', objectPosition: 'top'}} />
-          <h1 className="text-xl font-bold text-[#E53935] text-center">Tabungan Qurban Keluarga Peduli 1447H</h1>
+          <h1 className="text-xl font-bold text-emerald-600 text-center">Tabungan Qurban Keluarga Peduli 1447H</h1>
           <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900">
             Masuk ke Akun Kamu
           </h2>
@@ -110,7 +110,7 @@ export default function LoginPage() {
                   type="email"
                   autoComplete="email"
                   required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-emerald-600 focus:border-emerald-600 focus:z-10 sm:text-sm"
                   placeholder="Alamat Email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -126,7 +126,7 @@ export default function LoginPage() {
                   type="password"
                   autoComplete="current-password"
                   required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-emerald-600 focus:border-emerald-600 focus:z-10 sm:text-sm"
                   placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -136,7 +136,7 @@ export default function LoginPage() {
             {message && (
               <div
                 className={`py-2 px-3 rounded-md text-sm ${
-                  messageType === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                  messageType === 'error' ? 'bg-emerald-100 text-emerald-700' : 'bg-green-100 text-green-700'
                 }`}
               >
                 {message}
@@ -146,7 +146,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-[#E53935] hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600"
               >
                 {loading ? 'Memproses...' : 'Masuk'}
               </button>
@@ -154,16 +154,16 @@ export default function LoginPage() {
             <div className="mt-3">
               <a
                 href="/qurban/register"
-                className="block w-full text-center py-2 px-4 rounded-md bg-blue-600 text-white font-bold text-base hover:bg-blue-700 transition-colors"
+                className="block w-full text-center py-2 px-4 rounded-md bg-[#E53935] hover:bg-red-700 text-white font-bold text-base transition-colors"
                 style={{letterSpacing: '0.5px'}}>
-                Belum punya akun? Daftar Qurban Sekarang
+                Belum punya akun? <br /> Daftar Qurban Sekarang
               </a>
             </div>
           </form>
           <p className="mt-2 text-center text-sm text-gray-600">
             <button
               type="button"
-              className="font-medium text-[#E53935] hover:text-red-700 focus:outline-none"
+              className="font-medium text-emerald-600 hover:text-emerald-700 focus:outline-none"
               onClick={() => setShowForgot(true)}
             >
               Lupa password?
@@ -194,12 +194,12 @@ export default function LoginPage() {
                     onChange={e => setForgotEmail(e.target.value)}
                   />
                   {forgotMsg && (
-                    <div className={`text-sm ${forgotMsg.startsWith('Email reset') ? 'text-green-600' : 'text-red-600'}`}>{forgotMsg}</div>
+                    <div className={`text-sm ${forgotMsg.startsWith('Email reset') ? 'text-green-600' : 'text-emerald-600'}`}>{forgotMsg}</div>
                   )}
                   <button
                     type="submit"
                     disabled={forgotLoading}
-                    className="w-full bg-[#E53935] text-white py-2 rounded hover:bg-red-700"
+                    className="w-full bg-emerald-600 text-white py-2 rounded hover:bg-emerald-700"
                   >
                     {forgotLoading ? 'Mengirim...' : 'Kirim Link Reset'}
                   </button>
@@ -208,7 +208,7 @@ export default function LoginPage() {
             </div>
           )}
           <p className="mt-4 text-center text-sm text-gray-600">
-            <a href="/qurban/admin-login" className="font-medium text-[#E53935] hover:text-red-700">
+            <a href="/qurban/admin-login" className="font-medium text-emerald-600 hover:text-emerald-700">
               Login sebagai Admin
             </a>
           </p>
