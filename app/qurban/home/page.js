@@ -201,7 +201,7 @@ export default function LandingPage() {
           <KPICompare label="Pequrban" prev={year2025.pequrban} next={target2026.pequrban} />
           <div className="rounded-xl border border-gray-100 bg-white p-4">
             <div className="text-2xl font-extrabold text-gray-900 leading-none">Dampak Sosial-Ekonomi</div>
-            <div className="mt-1 text-xs text-gray-600">Peningkatan sejalan dengan dampak yang akan dirasakan oleh seberapa banyak penerima manfaat nantinya</div>
+            <div className="mt-1 text-xs text-gray-600">Besar peningkatan akan terlihat setelah dilaksanakan Impact Assessment</div>
           </div>
           <KPICompare label="Keluarga" prev={year2025.keluarga} next={target2026.keluarga} />
           <KPICompare label="Beneficiary" prev={year2025.beneficiary} next={target2026.beneficiary} />
