@@ -1,10 +1,8 @@
-import next from 'eslint-plugin-next';
-
+// Use Next.js recommended ESLint config without directly importing the plugin.
+// This avoids relying on a separate `eslint-plugin-next` package which may not
+// be available in some build environments.
 export default [
   {
-    plugins: { next },
-    rules: {
-      ...next.configs['core-web-vitals'].rules,
-    },
+    extends: ["next/core-web-vitals"],
   },
 ];
