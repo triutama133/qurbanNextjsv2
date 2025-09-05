@@ -1,8 +1,21 @@
-// Use Next.js recommended ESLint config without directly importing the plugin.
-// This avoids relying on a separate `eslint-plugin-next` package which may not
-// be available in some build environments.
+import { FlatCompat } from "@eslint/eslintrc";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const compat = new FlatCompat({
+  baseDirectory: __dirname,
+});
+
 export default [
+  ...compat.extends("next/core-web-vitals"),
   {
-    extends: ["next/core-web-vitals"],
+    rules: {
+      // Customize rules as needed
+      "@next/next/no-img-element": "off", // Allow img elements for external images
+      "react-hooks/exhaustive-deps": "warn",
+    },
   },
 ];

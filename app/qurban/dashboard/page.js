@@ -243,7 +243,7 @@ function DashboardContent() {
       fetchUserAndInit(router)
       hasInit.current = true
     }
-  }, [fetchUserAndInit]);
+  }, [fetchUserAndInit, router]);
 
   useEffect(() => {
     if (user && !profile) {

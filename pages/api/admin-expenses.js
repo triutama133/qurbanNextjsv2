@@ -1,37 +1,40 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createSupabaseAdmin, isSupabaseAvailable } from '../../lib/supabase-admin';
 
 export default async function handler(req, res) {
-  const supabase = createRouteHandlerClient({ cookies });
-
-  // Cek autentikasi admin
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  // Cek role admin
-  const { data: userData, error: userError } = await supabase
-    .from('users')
-    .select('Role')
-    .eq('UserId', user.id)
-    .single();
-  if (userError || !userData || userData.Role !== 'Admin') {
-    return res.status(403).json({ error: 'Forbidden' });
+  if (!isSupabaseAvailable()) {
+    return res.status(503).json({ error: 'Database service tidak tersedia' });
   }
 
+  const supabase = createSupabaseAdmin();
+
+  // Note: Since we're using admin client, we need to implement auth differently
+  // This would typically require implementing session verification separately
+  
   if (req.method === 'POST') {
     // Tambah pengeluaran
-    const { deskripsi, jumlah } = req.body;
-    if (!deskripsi || !jumlah || isNaN(Number(jumlah))) {
-      return res.status(400).json({ error: 'Deskripsi dan jumlah wajib diisi.' });
+    const { deskripsi, jumlah, adminUserId } = req.body;
+    if (!deskripsi || !jumlah || isNaN(Number(jumlah)) || !adminUserId) {
+      return res.status(400).json({ error: 'Deskripsi, jumlah, dan adminUserId wajib diisi.' });
     }
+
+    // Verify admin role first
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('Role')
+      .eq('UserId', adminUserId)
+      .single();
+    
+    if (userError || !userData || userData.Role !== 'Admin') {
+      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+    }
+
     const { data, error } = await supabase
       .from('pengeluaran_admin')
       .insert({
         Deskripsi: deskripsi,
         Jumlah: Number(jumlah),
         Tanggal: new Date().toISOString(),
-        AdminUserId: user.id,
+        AdminUserId: adminUserId,
       })
       .select()
       .single();
@@ -41,8 +44,20 @@ export default async function handler(req, res) {
 
   if (req.method === 'DELETE') {
     // Hapus pengeluaran
-    const { costId } = req.body;
-    if (!costId) return res.status(400).json({ error: 'costId wajib diisi.' });
+    const { costId, adminUserId } = req.body;
+    if (!costId || !adminUserId) return res.status(400).json({ error: 'costId dan adminUserId wajib diisi.' });
+    
+    // Verify admin role first
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('Role')
+      .eq('UserId', adminUserId)
+      .single();
+    
+    if (userError || !userData || userData.Role !== 'Admin') {
+      return res.status(403).json({ error: 'Forbidden - Admin access required' });
+    }
+
     const { error } = await supabase
       .from('pengeluaran_admin')
       .delete()

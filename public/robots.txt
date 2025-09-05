@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /
+
+# Important pages
+Allow: /qurban/home
+Allow: /qurban/register
+Allow: /qurban/login
+
+# Disallow admin and sensitive areas
+Disallow: /qurban/admin
+Disallow: /qurban/admin-dashboard
+Disallow: /qurban/admin-login
+Disallow: /qurban/settings
+Disallow: /api/
+
+# Sitemap
+Sitemap: https://yoursite.com/sitemap.xml

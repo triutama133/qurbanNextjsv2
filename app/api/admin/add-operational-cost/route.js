@@ -1,9 +1,13 @@
-import { createClient } from '@supabase/supabase-js';
+import { createSupabaseAdmin, isSupabaseAvailable } from '../../../../lib/supabase-admin';
 import { NextResponse } from 'next/server';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createSupabaseAdmin();
 
 export async function POST(request) {
+  if (!isSupabaseAvailable()) {
+    return NextResponse.json({ error: 'Database service tidak tersedia' }, { status: 503 });
+  }
+
   try {
     const { costId, description, amount } = await request.json();
 

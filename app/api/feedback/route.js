@@ -1,12 +1,12 @@
-import { createClient } from "@supabase/supabase-js";
+import { createSupabaseAdmin, isSupabaseAvailable } from "../../../lib/supabase-admin";
 
-// You can use env variables or hardcode for demo
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabase = createSupabaseAdmin();
 
 export async function POST(request) {
+  if (!isSupabaseAvailable()) {
+    return new Response(JSON.stringify({ error: "Database service tidak tersedia" }), { status: 503 });
+  }
+
   try {
     const { message, user_id } = await request.json();
     if (!message || !user_id) {
@@ -23,6 +23,10 @@ export async function POST(request) {
 }
 
 export async function GET() {
+  if (!isSupabaseAvailable()) {
+    return new Response(JSON.stringify({ error: "Database service tidak tersedia" }), { status: 503 });
+  }
+
   // For admin: get all feedback (simple, no auth)
   const { data, error } = await supabase
     .from("feedback")
