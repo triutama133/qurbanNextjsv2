@@ -55,31 +55,33 @@ export default function LandingPage() {
       `}</style>
 
       {/* NAV */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-gray-100">
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-gray-100" role="banner">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {/* pakai logo.png dari /public sesuai permintaan */}
-            <Image src="/logo.png" alt="Qurban Berdampak" width={40} height={40} className="rounded-md" />
+            <Image src="/logo.png" alt="Logo Qurban Berdampak" width={40} height={40} className="rounded-md" />
             <span className="font-extrabold tracking-tight text-lg">
               Qurban <span className="text-[var(--brand)]">Berdampak</span>
             </span>
           </div>
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-            <a href="#preview" className="hover:text-emerald-700">Project Preview</a>
-            <a href="#toc" className="hover:text-emerald-700">Design Program</a>
-            <a href="#alur" className="hover:text-emerald-700">Alur Program</a>
-            <a href="#faq" className="hover:text-emerald-700">FAQ</a>
+          <nav className="hidden md:flex items-center gap-6 text-sm font-medium" role="navigation" aria-label="Menu utama">
+            <a href="#preview" className="hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-md px-2 py-1">Project Preview</a>
+            <a href="#toc" className="hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-md px-2 py-1">Design Program</a>
+            <a href="#alur" className="hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-md px-2 py-1">Alur Program</a>
+            <a href="#faq" className="hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded-md px-2 py-1">FAQ</a>
           </nav>
           <div className="flex items-center gap-2">
             <button
               onClick={goLogin}
-              className="inline-flex px-3 py-2 text-sm sm:px-4 sm:py-2 sm:text-base rounded-lg border border-gray-300 hover:bg-gray-50"
+              className="inline-flex px-3 py-2 text-sm sm:px-4 sm:py-2 sm:text-base rounded-lg border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              aria-label="Masuk ke akun"
             >
               Masuk
             </button>
             <button
               onClick={goRegister}
-              className="inline-flex px-4 py-2 rounded-lg text-white shadow-sm bg-[var(--brand)] hover:bg-[var(--brand-700)]"
+              className="inline-flex px-4 py-2 rounded-lg text-white shadow-sm bg-[var(--brand)] hover:bg-[var(--brand-700)] focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              aria-label="Daftar sebagai pequrban baru"
             >
               Daftar Sekarang
             </button>
