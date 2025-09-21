@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { FAQ } from "@/app/qurban/home/page.js";
+import FAQ from "./FAQ.jsx";
 import MDEditor from "@uiw/react-md-editor";
 
 export default function FAQList() {
