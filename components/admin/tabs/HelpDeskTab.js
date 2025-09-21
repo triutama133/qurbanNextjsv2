@@ -73,7 +73,13 @@ const HelpDeskTab = ({ loadingHelpDesk, allHelpDeskTickets, handleReplyToTicket,
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">Manajemen Help Desk</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Manajemen Help Desk</h2>
+          <div className="mt-1 text-sm text-gray-600">
+            Email: <a href="mailto:tabunganqurbanproject@gmail.com" className="underline text-emerald-700">tabunganqurbanproject@gmail.com</a><br />
+            Telp/WA: <a href="https://wa.me/6285729141411" target="_blank" rel="noopener noreferrer" className="underline text-emerald-700">+6285729141411</a>
+          </div>
+        </div>
         <div className="flex gap-2">
           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
             {openTickets} Open

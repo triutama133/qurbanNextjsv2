@@ -16,8 +16,8 @@ export default function HelpDeskSection({
           <h4 className="font-semibold text-md text-gray-800 mb-2">Kontak Kami:</h4>
           <p className="text-sm text-gray-600">Untuk pertanyaan lebih lanjut, silakan hubungi:</p>
           <ul className="text-sm text-gray-700 mt-2 list-disc list-inside">
-            <li>Email: support@example.com</li>
-            <li>Telepon: +62 812 3456 7890</li>
+            <li>Email: tabunganqurbanproject@gmail.com</li>
+            <li>Telepon: +62857 2914 1411</li>
           </ul>
         </div>
 

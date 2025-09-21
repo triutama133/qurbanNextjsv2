@@ -65,7 +65,7 @@ export default function LandingPage() {
             <span className="font-extrabold tracking-tight text-lg">
               Qurban <span className="text-[var(--brand)]">Berdampak</span>
             </span>
-          </div>
+        </div>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
             <a href="#preview" className="hover:text-emerald-700">Project Preview</a>
             <a href="#toc" className="hover:text-emerald-700">Design Program</a>
@@ -196,18 +196,19 @@ export default function LandingPage() {
                 <span className="inline-flex items-center gap-2 text-xs font-semibold text-gray-600">
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" /> Dibandingkan capaian 2025
                 </span>
-                </div>
+            </div>
 
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          <KPICompare label="Ekor Sapi" prev={year2025.sapi} next={target2026.sapi} />
-          <KPICompare label="Pequrban" prev={year2025.pequrban} next={target2026.pequrban} />
-          <div className="rounded-xl border border-gray-100 bg-white p-4">
-            <div className="text-2xl font-extrabold text-gray-900 leading-none">Dampak Sosial-Ekonomi</div>
-            <div className="mt-1 text-xs text-gray-600">Besar peningkatan akan terlihat setelah dilaksanakan Impact Assessment</div>
-          </div>
-          <KPICompare label="Keluarga" prev={year2025.keluarga} next={target2026.keluarga} />
-          <KPICompare label="Beneficiary" prev={year2025.beneficiary} next={target2026.beneficiary} />
-        </div>
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+              <KPICompare label="Ekor Sapi" prev={year2025.sapi} next={target2026.sapi} />
+              <KPICompare label="Pequrban" prev={year2025.pequrban} next={target2026.pequrban} />
+              <div className="rounded-xl border border-gray-100 bg-white p-4">
+                <div className="text-2xl font-extrabold text-gray-900 leading-none">Dampak Sosial-Ekonomi</div>
+                <div className="mt-1 text-xs text-gray-600">Besar peningkatan akan terlihat setelah dilaksanakan Impact Assessment</div>
+              </div>
+              <KPICompare label="Keluarga" prev={year2025.keluarga} next={target2026.keluarga} />
+              <KPICompare label="Beneficiary" prev={year2025.beneficiary} next={target2026.beneficiary} />
+            </div>
+
 
 
             {/* Narasi bridging */}
@@ -216,10 +217,22 @@ export default function LandingPage() {
               menambah kapasitas pendampingan, dan <b>memperkuat standar pelaporan</b> (Assessment & Impact Report),
               agar dampak sosial–ekonomi makin terukur dan berkelanjutan.
             </p>
+            
+            {/* Tombol akses Project Deck 2026 - compact spacing */}
+            <div className="mt-2 flex justify-end">
+              <a
+                href="https://drive.google.com/file/d/1MQjZ_0x_7VQaBaLKTw36Hq_xtUx4lz5V/view"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" /></svg>
+                Lihat Project Deck 2026
+              </a>
+            </div>
 
 
-      
-          </div>
+        </div>
 
 
 
