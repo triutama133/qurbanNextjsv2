@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import FAQList from "@/components/FAQList.jsx";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 
@@ -214,6 +215,9 @@ export default function LandingPage() {
               menambah kapasitas pendampingan, dan <b>memperkuat standar pelaporan</b> (Assessment & Impact Report),
               agar dampak sosial–ekonomi makin terukur dan berkelanjutan.
             </p>
+
+
+      
           </div>
 
 
@@ -368,17 +372,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-extrabold tracking-tight">Pertanyaan Umum</h2>
           <div className="mt-6 divide-y divide-gray-200">
-            <FAQ q="Berapa setoran awal dan kapan pelunasannya?">
-              Setoran awal <b>Rp 300.000</b>. Pelunasan menjelang Idul Adha (± Rp 2,35 juta per pequrban—dapat menyesuaikan
-              target personal).
-            </FAQ>
-            <FAQ q="Apakah ada laporan program?">
-              Ada: <b>Assessment Report</b> (titik salur & kesiapan) dan <b>Impact Report</b> (hasil & dampak), lengkap dengan
-              dokumentasi.
-            </FAQ>
-            <FAQ q="Siapa penerima manfaat?">
-              Masyarakat muslim marginal di titik wilayah minim qurban, dipetakan bersama mitra lokal.
-            </FAQ>
+            <FAQList />
           </div>
         </div>
       </section>
@@ -574,7 +568,7 @@ function LI({ children }) {
   return <li>{children}</li>;
 }
 
-function FAQ({ q, children }) {
+export function FAQ({ q, children }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="py-4">
@@ -582,7 +576,7 @@ function FAQ({ q, children }) {
         <span className="font-semibold text-gray-900">{q}</span>
         <span className="text-gray-500">{open ? "−" : "+"}</span>
       </button>
-      {open && <p className="mt-2 text-sm text-gray-700">{children}</p>}
+      {open && <div className="mt-2 text-sm text-gray-700">{children}</div>}
     </div>
   );
 }

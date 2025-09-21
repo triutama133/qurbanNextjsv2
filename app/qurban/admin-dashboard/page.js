@@ -14,6 +14,7 @@ import MilestonesTab from "../../../components/admin/tabs/MilestonesTab"
 import NewsTab from "../../../components/admin/tabs/NewsTab"
 import ReportsTab from "../../../components/admin/tabs/ReportsTab"
 import OperationalCostsTab from "../../../components/admin/tabs/OperationalCostsTab"
+import QnATab from "../../../components/admin/tabs/QnATab"
 import useAdminDashboardData from "../../../hooks/useAdminDashboardData"
 
 export default function AdminDashboard() {
@@ -86,6 +87,7 @@ export default function AdminDashboard() {
     { key: "milestones", label: "Program Milestones" },
     { key: "news", label: "News & Updates" },
     { key: "costs", label: "Operational Costs" },
+    { key: "qna", label: "QnA / FAQ" },
   ]
 
   const renderTabContent = () => {
@@ -185,6 +187,8 @@ export default function AdminDashboard() {
             CardSkeleton={CardSkeleton}
           />
         )
+      case "qna":
+        return <QnATab />
       default:
         return null
     }
